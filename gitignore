@@ -1,16 +1,7 @@
-# Dependencies
-node_modules/
 
-# Environment variables
+node_modules/
 .env
 .env.*
-
-# Logs
 *.log
-
-# OS files
 .DS_Store
 Thumbs.db
-
-# Data file
-data.txt
