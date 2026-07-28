@@ -9,7 +9,14 @@ const sellerRouter = require("./routes/sellerRouter");
 const cartRouter = require("./routes/cartRouter");
 const wishlistRouter = require("./routes/wishlistRouter");
 const orderRouter = require("./routes/orderRouter");
+const cors = require("cors");
 const app = express();
+
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
+
 
 app.use(express.json());
 
