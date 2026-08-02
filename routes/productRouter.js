@@ -12,7 +12,6 @@ const {
   deleteProduct,
 } = require('../controllers/productController');
 
-// Multer Storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -23,10 +22,8 @@ const storage = multer.diskStorage({
   },
 });
 
-// File Filter
 const fileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -41,11 +38,8 @@ const upload = multer({
 
 router.get('/', getProducts);
 router.get('/:id', getProductById);
-
 router.post('/', auth, upload.single('image'), createProduct);
-
 router.put('/:id', auth, upload.single('image'), updateProduct);
-
 router.delete('/:id', auth, deleteProduct);
 
 module.exports = router;

@@ -2,7 +2,7 @@ exports.createProduct = async (req, res) => {
   try {
     const seller = await requireSeller(req.user.id);
 
-    const {
+      const {
       name,
       description,
       category,
@@ -10,7 +10,8 @@ exports.createProduct = async (req, res) => {
       price,
       rating,
       stock,
-    } = req.body;
+    } = req.body || {};
+
 
     if (!name || !category || !price) {
       return res.status(400).json({
@@ -19,9 +20,7 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    const image = req.file
-      ? `/uploads/${req.file.filename}`
-      : '';
+ const image = req.file ? `/uploads/${req.file.filename}` : '';
 
     const product = await Product.create({
       name,
