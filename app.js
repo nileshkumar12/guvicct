@@ -19,6 +19,8 @@ app.use(cors({
 
 
 app.use(express.json());
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const logger = require('./utils/logger');
 // const errorRouter = require('./utils/errorRoute');

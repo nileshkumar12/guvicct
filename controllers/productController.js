@@ -48,9 +48,14 @@ exports.getProductById = async (req, res) => {
 exports.createProduct = async (req, res) => {
   try {
     const seller = await requireSeller(req.user.id);
-    const { name, description, category, brand, price, rating, stock, image } = req.body;
+    const { name, description, category, brand, price, rating, stock } = req.body;
     if (!name || !category || !price) {
       return res.status(400).json({ success: false, message: 'Name, category, and price are required' });
+    }
+
+    let imagePath = req.body.image;
+    if (req.file) {
+      imagePath = `/uploads/${req.file.filename}`;
     }
 
     const product = await Product.create({
@@ -61,7 +66,7 @@ exports.createProduct = async (req, res) => {
       price,
       rating,
       stock,
-      image,
+      image: imagePath,
       seller: seller._id,
     });
 
@@ -81,6 +86,9 @@ exports.updateProduct = async (req, res) => {
     }
 
     const updateData = { ...req.body };
+    if (req.file) {
+      updateData.image = `/uploads/${req.file.filename}`;
+    }
     const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
