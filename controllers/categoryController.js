@@ -2,11 +2,17 @@ const Category = require('../models/categoryModel');
 
 exports.createCategory = async (req, res) => {
   try {
-    const { name, description, image } = req.body;
-    if (!name) return res.status(400).json({ success: false, message: 'Category name is required' });
+    const { name, description } = req.body || {};
+    const image = req.file ? `/uploads/${req.file.filename}` : req.body?.image || '';
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Category name is required' });
+    }
 
     const existing = await Category.findOne({ name });
-    if (existing) return res.status(409).json({ success: false, message: 'Category already exists' });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'Category already exists' });
+    }
 
     const category = await Category.create({ name, description, image });
     return res.status(201).json({ success: true, data: category });
@@ -26,8 +32,14 @@ exports.getCategories = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
   try {
-    const { name, description, image } = req.body;
-    const updateData = { name, description, image };
+    const { name, description } = req.body || {};
+    const image = req.file ? `/uploads/${req.file.filename}` : req.body?.image;
+
+    const updateData = {
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(image !== undefined && { image }),
+    };
 
     const category = await Category.findByIdAndUpdate(
       req.params.id,
