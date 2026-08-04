@@ -12,7 +12,10 @@ const APP_URL = process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : 
 
 const buildImageUrl = (req, filename) => {
   if (!filename) return '';
-  const baseUrl = IMG_URLS || APP_URL || `${req.protocol}://${req.get('host')}`;
+  const requestHost = req && req.get && req.get('host');
+  const baseUrl = requestHost
+    ? `${req.protocol}://${requestHost}`
+    : IMG_URLS || APP_URL || '';
   return `${baseUrl}/uploads/${filename}`;
 };
 

@@ -21,7 +21,6 @@ exports.createBrand = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-
 exports.getBrands = async (req, res) => {
   try {
     const brands = await Brand.find();
