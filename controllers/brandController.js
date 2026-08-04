@@ -1,10 +1,21 @@
 const Brand = require('../models/brandModel');
-const { buildImageUrl } = require('../utils/config');
+const { isBase64Image } = require('../utils/imageHelper');
+const { uploadBuffer, uploadBase64 } = require('../utils/cloudinary');
 
 exports.createBrand = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? buildImageUrl(req, req.file.filename) : req.body?.image || '';
+    let image = '';
+
+    if (req.file && req.file.buffer) {
+      const uploadResult = await uploadBuffer(req.file.buffer, req.file.mimetype);
+      image = uploadResult.secure_url;
+    } else if (req.body?.image && isBase64Image(req.body.image)) {
+      const uploadResult = await uploadBase64(req.body.image);
+      image = uploadResult.secure_url;
+    } else {
+      image = req.body?.image || '';
+    }
 
     if (!name) {
       return res.status(400).json({ success: false, message: 'Brand name is required' });
@@ -33,7 +44,17 @@ exports.getBrands = async (req, res) => {
 exports.updateBrand = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? buildImageUrl(req, req.file.filename) : req.body?.image;
+    let image;
+
+    if (req.file && req.file.buffer) {
+      const uploadResult = await uploadBuffer(req.file.buffer, req.file.mimetype);
+      image = uploadResult.secure_url;
+    } else if (req.body?.image && isBase64Image(req.body.image)) {
+      const uploadResult = await uploadBase64(req.body.image);
+      image = uploadResult.secure_url;
+    } else if (req.body?.image !== undefined) {
+      image = req.body.image;
+    }
 
     const updateData = {
       ...(name !== undefined && { name }),

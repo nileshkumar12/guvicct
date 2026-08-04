@@ -1,6 +1,7 @@
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
-const { buildImageUrl } = require('../utils/config');
+const { isBase64Image } = require('../utils/imageHelper');
+const { uploadBuffer, uploadBase64 } = require('../utils/cloudinary');
 
 const requireSeller = async (userId) => {
   const seller = await User.findById(userId);
@@ -104,7 +105,17 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    const image = req.file ? buildImageUrl(req, req.file.filename) : '';
+    let image = '';
+
+    if (req.file && req.file.buffer) {
+      const uploadResult = await uploadBuffer(req.file.buffer, req.file.mimetype);
+      image = uploadResult.secure_url;
+    } else if (req.body?.image && isBase64Image(req.body.image)) {
+      const uploadResult = await uploadBase64(req.body.image);
+      image = uploadResult.secure_url;
+    } else {
+      image = req.body?.image || '';
+    }
 
     const product = await Product.create({
       name,
@@ -168,8 +179,14 @@ exports.updateProduct = async (req, res) => {
       ...(stock !== undefined && { stock }),
     };
 
-    if (req.file) {
-      updateData.image = buildImageUrl(req, req.file.filename);
+    if (req.file && req.file.buffer) {
+      const uploadResult = await uploadBuffer(req.file.buffer, req.file.mimetype);
+      updateData.image = uploadResult.secure_url;
+    } else if (req.body?.image && isBase64Image(req.body.image)) {
+      const uploadResult = await uploadBase64(req.body.image);
+      updateData.image = uploadResult.secure_url;
+    } else if (req.body?.image !== undefined) {
+      updateData.image = req.body.image;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

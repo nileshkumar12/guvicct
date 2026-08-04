@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const auth = require('../middleware/auth');
 
 const {
@@ -13,18 +11,7 @@ const {
   deleteProduct,
 } = require('../controllers/productController');
 
-const uploadDir = path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + path.extname(file.originalname);
-    cb(null, uniqueName);
-  },
-});
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
@@ -35,10 +22,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-});
+const upload = multer({ storage, fileFilter });
 
 router.get('/', getProducts);
 router.get('/:id', getProductById);
