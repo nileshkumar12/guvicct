@@ -1,6 +1,6 @@
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
-const { IMG_URLS } = require('../utils/config');
+const { buildImageUrl } = require('../utils/config');
 
 const requireSeller = async (userId) => {
   const seller = await User.findById(userId);
@@ -104,7 +104,7 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    const image = req.file ? `${IMG_URLS || ''}/uploads/${req.file.filename}` : '';
+    const image = req.file ? buildImageUrl(req, req.file.filename) : '';
 
     const product = await Product.create({
       name,
@@ -169,7 +169,7 @@ exports.updateProduct = async (req, res) => {
     };
 
     if (req.file) {
-      updateData.image = `${IMG_URLS || ''}/uploads/${req.file.filename}`;
+      updateData.image = buildImageUrl(req, req.file.filename);
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(

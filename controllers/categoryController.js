@@ -1,10 +1,10 @@
 const Category = require('../models/categoryModel');
-const { IMG_URLS } = require('../utils/config');
+const { buildImageUrl } = require('../utils/config');
 
 exports.createCategory = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? `${IMG_URLS || ''}/uploads/${req.file.filename}` : req.body?.image || '';
+    const image = req.file ? buildImageUrl(req, req.file.filename) : req.body?.image || '';
 
     if (!name) {
       return res.status(400).json({ success: false, message: 'Category name is required' });
@@ -34,7 +34,7 @@ exports.getCategories = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? `${IMG_URLS || ''}/uploads/${req.file.filename}` : req.body?.image;
+    const image = req.file ? buildImageUrl(req, req.file.filename) : req.body?.image;
 
     const updateData = {
       ...(name !== undefined && { name }),
