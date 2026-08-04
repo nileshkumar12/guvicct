@@ -1,9 +1,10 @@
 const Brand = require('../models/brandModel');
+const { IMG_URLS } = require('../utils/config');
 
 exports.createBrand = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? `/uploads/${req.file.filename}` : req.body?.image || '';
+    const image = req.file ? `${IMG_URLS || ''}/uploads/${req.file.filename}` : req.body?.image || '';
 
     if (!name) {
       return res.status(400).json({ success: false, message: 'Brand name is required' });
@@ -33,7 +34,7 @@ exports.getBrands = async (req, res) => {
 exports.updateBrand = async (req, res) => {
   try {
     const { name, description } = req.body || {};
-    const image = req.file ? `/uploads/${req.file.filename}` : req.body?.image;
+    const image = req.file ? `${IMG_URLS || ''}/uploads/${req.file.filename}` : req.body?.image;
 
     const updateData = {
       ...(name !== undefined && { name }),

@@ -7,9 +7,11 @@ dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI;
 const HOST = process.env.HOST;
 const PORT = process.env.PORT;
+const IMG_URLS = process.env.IMG_URLS ? process.env.IMG_URLS.replace(/\/+$/, '') : '';
 
 module.exports = {
     MONGODB_URI,
     HOST,
-    PORT
-}
+    PORT,
+    IMG_URLS,
+};
