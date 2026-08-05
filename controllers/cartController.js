@@ -15,16 +15,52 @@ exports.getCart = async (req, res) => {
 exports.addProduct = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { productId, quantity = 1 } = req.body;
-    if (!productId) return res.status(400).json({ success: false, message: 'productId is required' });
-
-    const product = await Product.findById(productId);
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+    const { productId, quantity = 1, items } = req.body;
 
     let cart = await Cart.findOne({ user: userId });
     if (!cart) {
       cart = await Cart.create({ user: userId, items: [] });
     }
+
+    // Support bulk cart sync payload: { items: [{ product|productId, quantity }] }
+    if (Array.isArray(items)) {
+      const normalizedItems = [];
+
+      for (const item of items) {
+        const incomingProductId = item?.productId || item?.product;
+        if (!incomingProductId) {
+          return res.status(400).json({ success: false, message: 'Each item must include productId or product' });
+        }
+
+        const product = await Product.findById(incomingProductId);
+        if (!product) {
+          return res.status(404).json({ success: false, message: `Product not found: ${incomingProductId}` });
+        }
+
+        const qty = Number(item?.quantity ?? 1);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          return res.status(400).json({ success: false, message: `Invalid quantity for product: ${incomingProductId}` });
+        }
+
+        normalizedItems.push({
+          product: incomingProductId,
+          quantity: qty,
+          price: product.price,
+        });
+      }
+
+      cart.items = normalizedItems;
+      await cart.save();
+      await cart.populate('items.product');
+      return res.status(200).json({ success: true, data: cart });
+    }
+
+    if (!productId) {
+      return res.status(400).json({ success: false, message: 'productId is required when items is not provided' });
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
     const existingIndex = cart.items.findIndex(i => i.product.toString() === productId);
     if (existingIndex > -1) {
