@@ -49,19 +49,27 @@ const getSellerProductIds = async (sellerId) => {
   return products.map((product) => product._id);
 };
 
+const normalizeShippingAddress = (shippingAddress = {}) => ({
+  line1: shippingAddress.line1 || shippingAddress.addressLine1 || shippingAddress.address || shippingAddress.street || '',
+  line2: shippingAddress.line2 || shippingAddress.addressLine2 || '',
+  city: shippingAddress.city || '',
+  state: shippingAddress.state || '',
+  postalCode: shippingAddress.postalCode || shippingAddress.zipCode || shippingAddress.zip || shippingAddress.pincode || '',
+  country: shippingAddress.country || 'India',
+});
+
 exports.placeOrder = async (req, res) => {
   try {
     const userId = req.user.id;
     const { items, shippingAddress, paymentMethod, shippingCost = 0, tax = 0 } = req.body;
+    const normalizedShippingAddress = normalizeShippingAddress(shippingAddress);
+    const resolvedPaymentMethod = paymentMethod || 'COD';
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Order items are required' });
     }
-    if (!shippingAddress || !shippingAddress.line1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode || !shippingAddress.country) {
+    if (!normalizedShippingAddress.line1 || !normalizedShippingAddress.city || !normalizedShippingAddress.state || !normalizedShippingAddress.postalCode) {
       return res.status(400).json({ success: false, message: 'Complete shipping address is required' });
-    }
-    if (!paymentMethod) {
-      return res.status(400).json({ success: false, message: 'Payment method is required' });
     }
 
     const { orderItems, subtotal } = await normalizeOrderItems(items);
@@ -71,8 +79,8 @@ exports.placeOrder = async (req, res) => {
     const order = await Order.create({
       user: userId,
       items: orderItems,
-      shippingAddress,
-      paymentMethod,
+      shippingAddress: normalizedShippingAddress,
+      paymentMethod: resolvedPaymentMethod,
       subtotal,
       shippingCost,
       tax,
@@ -81,7 +89,7 @@ exports.placeOrder = async (req, res) => {
 
     return res.status(201).json({ success: true, data: order });
   } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
+    return res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
 

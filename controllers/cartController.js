@@ -15,17 +15,12 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const payloadUserId = req.body?.user || req.body?.userId;
     const tokenUserId = req.user?.id;
-    const resolvedUserId = payloadUserId || tokenUserId;
+    const resolvedUserId = tokenUserId || req.body?.user || req.body?.userId;
     const { productId, quantity = 1, items } = req.body;
 
     if (!resolvedUserId) {
       return res.status(400).json({ success: false, message: 'user is required' });
-    }
-
-    if (payloadUserId && tokenUserId && payloadUserId !== tokenUserId) {
-      return res.status(400).json({ success: false, message: 'Payload user does not match authenticated user' });
     }
 
     if (!mongoose.Types.ObjectId.isValid(resolvedUserId)) {
