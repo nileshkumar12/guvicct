@@ -9,9 +9,9 @@ const dotenv = require("dotenv");
 dotenv.config();
 // connect to the mongodb database
 mongoose    
-    .connect(process.env.MONGODB_URI)
+    .connect(MONGODB_URI)
     .then(() => {
-        console.log('Connected to MongoDB database');
+        console.log(`Connected to MongoDB database: ${mongoose.connection.name}`);
 
         // start the server to listen for requests
         app

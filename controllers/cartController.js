@@ -1,5 +1,6 @@
 const Cart = require('../models/cartModel');
 const Product = require('../models/productModel');
+const mongoose = require('mongoose');
 
 exports.getCart = async (req, res) => {
   try {
@@ -14,38 +15,60 @@ exports.getCart = async (req, res) => {
 
 exports.addProduct = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const payloadUserId = req.body?.user || req.body?.userId;
+    const tokenUserId = req.user?.id;
+    const resolvedUserId = payloadUserId || tokenUserId;
     const { productId, quantity = 1, items } = req.body;
 
-    let cart = await Cart.findOne({ user: userId });
-    if (!cart) {
-      cart = await Cart.create({ user: userId, items: [] });
+    if (!resolvedUserId) {
+      return res.status(400).json({ success: false, message: 'user is required' });
     }
 
-    // Support bulk cart sync payload: { items: [{ product|productId, quantity }] }
+    if (payloadUserId && tokenUserId && payloadUserId !== tokenUserId) {
+      return res.status(400).json({ success: false, message: 'Payload user does not match authenticated user' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+      return res.status(400).json({ success: false, message: 'user must be a valid Mongo ObjectId' });
+    }
+
+    let cart = await Cart.findOne({ user: resolvedUserId });
+    if (!cart) {
+      cart = await Cart.create({ user: resolvedUserId, items: [] });
+    }
+
+    // Support bulk cart sync payload: { user, items: [{ product|productId, quantity, price }] }
     if (Array.isArray(items)) {
       const normalizedItems = [];
 
       for (const item of items) {
-        const incomingProductId = item?.productId || item?.product;
+        const rawProduct = item?.productId || item?.product || item?._id;
+        const incomingProductId = typeof rawProduct === 'object' && rawProduct !== null
+          ? (rawProduct._id || rawProduct.id)
+          : rawProduct;
+
         if (!incomingProductId) {
           return res.status(400).json({ success: false, message: 'Each item must include productId or product' });
         }
 
-        const product = await Product.findById(incomingProductId);
-        if (!product) {
-          return res.status(404).json({ success: false, message: `Product not found: ${incomingProductId}` });
+        if (!mongoose.Types.ObjectId.isValid(incomingProductId)) {
+          return res.status(400).json({ success: false, message: `Invalid product id: ${incomingProductId}` });
         }
+
+        const product = await Product.findById(incomingProductId).select('price');
 
         const qty = Number(item?.quantity ?? 1);
         if (!Number.isFinite(qty) || qty <= 0) {
           return res.status(400).json({ success: false, message: `Invalid quantity for product: ${incomingProductId}` });
         }
 
+        const fallbackPrice = Number(item?.price);
+        const resolvedPrice = product?.price ?? (Number.isFinite(fallbackPrice) ? fallbackPrice : undefined);
+
         normalizedItems.push({
           product: incomingProductId,
           quantity: qty,
-          price: product.price,
+          price: resolvedPrice,
         });
       }
 
@@ -57,6 +80,10 @@ exports.addProduct = async (req, res) => {
 
     if (!productId) {
       return res.status(400).json({ success: false, message: 'productId is required when items is not provided' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ success: false, message: 'productId must be a valid Mongo ObjectId' });
     }
 
     const product = await Product.findById(productId);

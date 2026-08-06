@@ -10,6 +10,7 @@ const sellerRouter = require("./routes/sellerRouter");
 const cartRouter = require("./routes/cartRouter");
 const wishlistRouter = require("./routes/wishlistRouter");
 const orderRouter = require("./routes/orderRouter");
+const adminRouter = require("./routes/adminRouter");
 const cors = require("cors");
 const path = require("path");
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/seller", sellerRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/orders", orderRouter);
+app.use("/api/admin", adminRouter);
 app.use("/users", userRouter);
 app.use("/invoice", invoiceRouter);
 

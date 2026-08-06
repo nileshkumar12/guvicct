@@ -3,13 +3,14 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const {
   placeOrder,
-  orderHistory,
+  buyerOrders,
   orderDetails,
   cancelOrder,
 } = require('../controllers/orderController');
 
 router.post('/', auth, placeOrder);
-router.get('/', auth, orderHistory);
+router.get('/buyer-orders', auth, buyerOrders);
+router.get('/', auth, buyerOrders);
 router.get('/:id', auth, orderDetails);
 router.put('/:id/cancel', auth, cancelOrder);
 
