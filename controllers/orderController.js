@@ -213,3 +213,26 @@ exports.cancelOrder = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.deleteBuyerOrderHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const order = await Order.findOne({ _id: req.params.id, user: userId });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status !== 'Delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only delivered orders can be deleted from history',
+      });
+    }
+
+    await Order.deleteOne({ _id: order._id });
+    return res.status(200).json({ success: true, message: 'Order removed from history' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

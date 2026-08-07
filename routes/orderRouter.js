@@ -6,6 +6,7 @@ const {
   buyerOrders,
   orderDetails,
   cancelOrder,
+  deleteBuyerOrderHistory,
 } = require('../controllers/orderController');
 
 router.post('/', auth, placeOrder);
@@ -13,5 +14,6 @@ router.get('/buyer-orders', auth, buyerOrders);
 router.get('/', auth, buyerOrders);
 router.get('/:id', auth, orderDetails);
 router.put('/:id/cancel', auth, cancelOrder);
+router.delete('/:id', auth, deleteBuyerOrderHistory);
 
 module.exports = router;

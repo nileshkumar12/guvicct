@@ -40,7 +40,7 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/brands", brandRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/cart", cartRouter);
-app.use("/api/wishlist", wishlistRouter);
+app.use("/api/wish  list", wishlistRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
 app.use("/users", userRouter);
