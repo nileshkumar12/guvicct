@@ -36,11 +36,10 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'], default: 'Pending' },
 }, { timestamps: true });
 
-orderSchema.pre('validate', function setOrderNumberIfMissing(next) {
+orderSchema.pre('validate', function setOrderNumberIfMissing() {
   if (!this.orderNumber) {
     this.orderNumber = generateOrderNumber();
   }
-  next();
 });
 
 module.exports = mongoose.model('Order', orderSchema);
