@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
      gender:{
         type:String
     },
-      profileimg:{
+    profileimg:{
         type:String
     },
 
@@ -44,8 +44,71 @@ const userSchema = new mongoose.Schema({
       default: "buyer",
     },
 
-},{
-    timestamps:true
-});
+    store: {
+      storeName: {
+        type: String,
+      },
+
+      storeDescription: {
+        type: String,
+      },
+
+      sellerName: {
+        type: String,
+      },
+
+      email: {
+        type: String,
+      },
+
+      phone: {
+        type: String,
+      },
+
+      category: {
+        type: String,
+      },
+
+      gstin: {
+        type: String,
+      },
+
+      pan: {
+        type: String,
+      },
+
+      address: {
+        type: String,
+      },
+
+      city: {
+        type: String,
+      },
+
+      state: {
+        type: String,
+      },
+
+      pincode: {
+        type: String,
+      },
+
+      openingTime: {
+        type: String,
+      },
+
+      closingTime: {
+        type: String,
+      },
+
+      storeLogo: {
+        type: String,
+      },
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 module.exports = mongoose.model("User",userSchema);
