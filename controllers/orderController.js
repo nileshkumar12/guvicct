@@ -112,6 +112,7 @@ const normalizeShippingAddress = (shippingAddress = {}) => ({
   country: shippingAddress.country || 'India',
 });
 
+
 exports.placeOrder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -125,14 +126,12 @@ exports.placeOrder = async (req, res) => {
     } = req.body;
 
     const normalizedShippingAddress =
-      normalizeShippingAddress(shippingAddress);
+      normalizeShippingAddress(
+        shippingAddress
+      );
 
     const resolvedPaymentMethod =
       paymentMethod || "COD";
-
-    // -----------------------------
-    // Validate items
-    // -----------------------------
 
     if (
       !items ||
@@ -145,10 +144,6 @@ exports.placeOrder = async (req, res) => {
       });
     }
 
-    // -----------------------------
-    // Validate address
-    // -----------------------------
-
     if (
       !normalizedShippingAddress.line1 ||
       !normalizedShippingAddress.city ||
@@ -157,13 +152,10 @@ exports.placeOrder = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Complete shipping address is required",
+        message:
+          "Complete shipping address is required",
       });
     }
-
-    // -----------------------------
-    // Normalize products
-    // -----------------------------
 
     const {
       orderItems,
@@ -171,35 +163,27 @@ exports.placeOrder = async (req, res) => {
       sellerIds,
     } = await normalizeOrderItems(items);
 
-    // -----------------------------
-    // Calculate total
-    // -----------------------------
-
     const total =
       subtotal +
       Number(shippingCost) +
       Number(tax);
 
-    // -----------------------------
-    // Generate Order Number
-    // -----------------------------
-
+    // Generate ONCE
     const orderNumber = generateOrderNumber();
 
-    // -----------------------------
-    // Create Order
-    // -----------------------------
-
+    // Create order
     const order = await Order.create({
-      orderNumber,
-
       user: userId,
+
+      orderNumber,
 
       items: orderItems,
 
-      shippingAddress: normalizedShippingAddress,
+      shippingAddress:
+        normalizedShippingAddress,
 
-      paymentMethod: resolvedPaymentMethod,
+      paymentMethod:
+        resolvedPaymentMethod,
 
       subtotal,
 
@@ -210,10 +194,7 @@ exports.placeOrder = async (req, res) => {
       total,
     });
 
-    // -----------------------------
-    // Create Seller Notifications
-    // -----------------------------
-
+    // Seller notifications
     if (sellerIds.length > 0) {
       await SellerNotification.insertMany(
         sellerIds.map((sellerId) => ({
@@ -225,38 +206,34 @@ exports.placeOrder = async (req, res) => {
 
           title: "New Order Received",
 
-          message: `You have received a new order #${order.orderNumber}`,
+          message:
+            `You have received a new order #${order.orderNumber}`,
 
           isRead: false,
         }))
       );
     }
 
-    // -----------------------------
-    // Response
-    // -----------------------------
-
     return res.status(201).json({
       success: true,
-
-      message: "Order placed successfully",
 
       order: {
         _id: order._id,
 
-        orderNumber: order.orderNumber,
-
-        total: order.total,
-
-        paymentMethod: order.paymentMethod,
+        orderNumber:
+          order.orderNumber,
       },
     });
 
   } catch (error) {
+    console.error(
+      "Place order error:",
+      error
+    );
 
-    console.error("Place Order Error:", error);
-
-    return res.status(error.status || 500).json({
+    return res.status(
+      error.status || 500
+    ).json({
       success: false,
       message: error.message,
     });
