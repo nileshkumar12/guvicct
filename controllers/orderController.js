@@ -1,7 +1,7 @@
 const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
-
+const SellerNotification = require("../models/sellerNotificationModel");
 const ORDER_STATUS = ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
 
 const requireRole = async (userId, allowedRoles) => {
@@ -21,7 +21,7 @@ const requireRole = async (userId, allowedRoles) => {
 
   return user;
 };
-
+/*
 const normalizeOrderItems = async (items) => {
   const orderItems = [];
   let subtotal = 0;
@@ -42,6 +42,59 @@ const normalizeOrderItems = async (items) => {
   }
 
   return { orderItems, subtotal };
+};*/
+
+const normalizeOrderItems = async (items) => {
+  const orderItems = [];
+  let subtotal = 0;
+
+  // Store unique seller IDs
+  const sellerIds = new Set();
+
+  for (const item of items) {
+    const incomingProductId =
+      item?.productId ||
+      item?.product ||
+      item?._id;
+
+    const product = await Product.findById(
+      incomingProductId
+    ).select("_id name price seller");
+
+    if (!product) {
+      const error = new Error(
+        `Product not found: ${incomingProductId}`
+      );
+
+      error.status = 404;
+      throw error;
+    }
+
+    const quantity = Number(item.quantity) || 1;
+
+    const price = Number.isFinite(Number(item.price))
+      ? Number(item.price)
+      : product.price;
+
+    subtotal += price * quantity;
+
+    orderItems.push({
+      product: product._id,
+      quantity,
+      price,
+    });
+
+    // Collect seller
+    if (product.seller) {
+      sellerIds.add(String(product.seller));
+    }
+  }
+
+  return {
+    orderItems,
+    subtotal,
+    sellerIds: [...sellerIds],
+  };
 };
 
 const getSellerProductIds = async (sellerId) => {
@@ -61,20 +114,74 @@ const normalizeShippingAddress = (shippingAddress = {}) => ({
 exports.placeOrder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { items, shippingAddress, paymentMethod, shippingCost = 0, tax = 0 } = req.body;
-    const normalizedShippingAddress = normalizeShippingAddress(shippingAddress);
-    const resolvedPaymentMethod = paymentMethod || 'COD';
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'Order items are required' });
+    const {
+      items,
+      shippingAddress,
+      paymentMethod,
+      shippingCost = 0,
+      tax = 0,
+    } = req.body;
+
+    const normalizedShippingAddress =
+      normalizeShippingAddress(shippingAddress);
+
+    const resolvedPaymentMethod =
+      paymentMethod || "COD";
+
+    // -----------------------------
+    // Validate items
+    // -----------------------------
+
+    if (
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Order items are required",
+      });
     }
-    if (!normalizedShippingAddress.line1 || !normalizedShippingAddress.city || !normalizedShippingAddress.state || !normalizedShippingAddress.postalCode) {
-      return res.status(400).json({ success: false, message: 'Complete shipping address is required' });
+
+    // -----------------------------
+    // Validate address
+    // -----------------------------
+
+    if (
+      !normalizedShippingAddress.line1 ||
+      !normalizedShippingAddress.city ||
+      !normalizedShippingAddress.state ||
+      !normalizedShippingAddress.postalCode
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Complete shipping address is required",
+      });
     }
 
-    const { orderItems, subtotal } = await normalizeOrderItems(items);
+    // -----------------------------
+    // Normalize products
+    // -----------------------------
 
-    const total = subtotal + Number(shippingCost) + Number(tax);
+    const {
+      orderItems,
+      subtotal,
+      sellerIds,
+    } = await normalizeOrderItems(items);
+
+    // -----------------------------
+    // Calculate total
+    // -----------------------------
+
+    const total =
+      subtotal +
+      Number(shippingCost) +
+      Number(tax);
+
+    // -----------------------------
+    // Create order
+    // -----------------------------
 
     const order = await Order.create({
       user: userId,
@@ -87,9 +194,41 @@ exports.placeOrder = async (req, res) => {
       total,
     });
 
-    return res.status(201).json({ success: true, data: order });
+    // -----------------------------
+    // Create seller notifications
+    // -----------------------------
+
+    if (sellerIds.length > 0) {
+      await SellerNotification.insertMany(
+        sellerIds.map((sellerId) => ({
+          seller: sellerId,
+          order: order._id,
+          type: "NEW_ORDER",
+          title: "New Order Received",
+          message: `You have received a new order #${order.orderNumber}`,
+          isRead: false,
+        }))
+      );
+    }
+
+    // -----------------------------
+    // Send response
+    // -----------------------------
+
+    return res.status(201).json({
+      success: true,
+
+      order: {
+        _id: order._id,
+        orderNumber: order.orderNumber,
+      },
+    });
+
   } catch (error) {
-    return res.status(error.status || 500).json({ success: false, message: error.message });
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

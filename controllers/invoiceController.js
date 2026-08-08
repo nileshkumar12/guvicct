@@ -1,6 +1,6 @@
 const Invoice = require("../models/invoiceModel");
 
-exports.createInvoice = async (req, res) => {
+const createInvoice = async (req, res) => {
 
     try {
 
@@ -64,7 +64,7 @@ exports.createInvoice = async (req, res) => {
 }
 
 
-exports.getInvoices = async (req, res) => {
+const getInvoices = async (req, res) => {
     try {
         const invoices = await Invoice.find({ user: req.user.id });
         res.status(200).json({ success: true, count: invoices.length, data: invoices });
@@ -73,7 +73,7 @@ exports.getInvoices = async (req, res) => {
     }
 };
 
-exports.updateInvoice = async (req, res) => {
+const updateInvoice = async (req, res) => {
     try {
         const invoice = await Invoice.findOneAndUpdate(
             { _id: req.params.id, user: req.user.id },
@@ -89,7 +89,7 @@ exports.updateInvoice = async (req, res) => {
     }
 };
 
-exports.deleteInvoice = async (req, res) => {
+const deleteInvoice = async (req, res) => {
     try {
         const invoice = await Invoice.findOneAndDelete({ _id: req.params.id, user: req.user.id });
         if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
@@ -98,3 +98,6 @@ exports.deleteInvoice = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+
+module.exports={ createInvoice, getInvoices, updateInvoice, deleteInvoice };

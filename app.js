@@ -11,6 +11,9 @@ const cartRouter = require("./routes/cartRouter");
 const wishlistRouter = require("./routes/wishlistRouter");
 const orderRouter = require("./routes/orderRouter");
 const adminRouter = require("./routes/adminRouter");
+const paymentRoutes = require("./routes/paymentRoutes");
+const notificationRoutes = require('./routes/notificationRoutes');
+const shipmentRoutes = require('./routes/shipmentRoutes');
 const cors = require("cors");
 const path = require("path");
 const app = express();
@@ -45,5 +48,10 @@ app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
 app.use("/users", userRouter);
 app.use("/invoice", invoiceRouter);
+app.use("/api/payment", paymentRoutes);
+app.use('/api/seller/notifications', notificationRoutes);
+app.use('/api/seller/shipments', shipmentRoutes);
+app.use('/api/shipments', shipmentRoutes); 
+
 
 module.exports =app;
