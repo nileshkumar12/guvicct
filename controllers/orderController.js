@@ -2,6 +2,7 @@ const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
 const SellerNotification = require("../models/sellerNotificationModel");
+const { generateOrderNumber } = require('../utils/orderId');
 const ORDER_STATUS = ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'];
 
 const requireRole = async (userId, allowedRoles) => {
@@ -180,51 +181,81 @@ exports.placeOrder = async (req, res) => {
       Number(tax);
 
     // -----------------------------
-    // Create order
+    // Generate Order Number
+    // -----------------------------
+
+    const orderNumber = generateOrderNumber();
+
+    // -----------------------------
+    // Create Order
     // -----------------------------
 
     const order = await Order.create({
+      orderNumber,
+
       user: userId,
+
       items: orderItems,
+
       shippingAddress: normalizedShippingAddress,
+
       paymentMethod: resolvedPaymentMethod,
+
       subtotal,
+
       shippingCost,
+
       tax,
+
       total,
     });
 
     // -----------------------------
-    // Create seller notifications
+    // Create Seller Notifications
     // -----------------------------
 
     if (sellerIds.length > 0) {
       await SellerNotification.insertMany(
         sellerIds.map((sellerId) => ({
           seller: sellerId,
+
           order: order._id,
+
           type: "NEW_ORDER",
+
           title: "New Order Received",
+
           message: `You have received a new order #${order.orderNumber}`,
+
           isRead: false,
         }))
       );
     }
 
     // -----------------------------
-    // Send response
+    // Response
     // -----------------------------
 
     return res.status(201).json({
       success: true,
 
+      message: "Order placed successfully",
+
       order: {
         _id: order._id,
+
         orderNumber: order.orderNumber,
+
+        total: order.total,
+
+        paymentMethod: order.paymentMethod,
       },
     });
 
   } catch (error) {
+
+    console.error("Place Order Error:", error);
+
     return res.status(error.status || 500).json({
       success: false,
       message: error.message,

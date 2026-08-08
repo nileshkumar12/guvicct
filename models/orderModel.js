@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { generateOrderNumber } = require('../utils/orderId');
 
 const orderItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -16,7 +17,15 @@ const addressSchema = new mongoose.Schema({
 });
 
 const orderSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  orderNumber: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true,
+    default: generateOrderNumber,
+    match: /^ORD-\d{8}-[A-F0-9]{6}$/,
+  },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true,   unique: true, },
   items: [orderItemSchema],
   shippingAddress: { type: addressSchema, required: true },
   paymentMethod: { type: String, required: true },
@@ -26,5 +35,12 @@ const orderSchema = new mongoose.Schema({
   total: { type: Number, required: true },
   status: { type: String, enum: ['Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled'], default: 'Pending' },
 }, { timestamps: true });
+
+orderSchema.pre('validate', function setOrderNumberIfMissing(next) {
+  if (!this.orderNumber) {
+    this.orderNumber = generateOrderNumber();
+  }
+  next();
+});
 
 module.exports = mongoose.model('Order', orderSchema);
