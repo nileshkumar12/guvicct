@@ -20,7 +20,6 @@ const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
     required: true,
-    unique: true,
     index: true,
     default: generateOrderNumber,
     match: /^ORD-\d{8}-[A-F0-9]{6}$/,
