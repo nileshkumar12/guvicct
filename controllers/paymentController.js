@@ -1,9 +1,17 @@
-const razorpay = require("../utils/razorpay");
+const getRazorpay = require("../utils/razorpay");
 const crypto = require("crypto");
 
 // CREATE RAZORPAY ORDER
 exports.createOrder = async (req, res) => {
     try {
+        const razorpay = getRazorpay();
+        if (!razorpay) {
+            return res.status(500).json({
+                success: false,
+                message: "Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+            });
+        }
+
         const { amount } = req.body;
 
         if (!amount) {

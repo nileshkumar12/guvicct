@@ -15,6 +15,8 @@ const PORT = normalizeEnv(process.env.PORT);
 const CLOUDINARY_CLOUD_NAME = normalizeEnv(process.env.CLOUDINARY_CLOUD_NAME);
 const CLOUDINARY_API_KEY = normalizeEnv(process.env.CLOUDINARY_API_KEY);
 const CLOUDINARY_API_SECRET = normalizeEnv(process.env.CLOUDINARY_API_SECRET);
+const RAZORPAY_KEY_ID = normalizeEnv(process.env.RAZORPAY_KEY_ID);
+const RAZORPAY_KEY_SECRET = normalizeEnv(process.env.RAZORPAY_KEY_SECRET);
 
 module.exports = {
     MONGODB_URI,
@@ -23,4 +25,6 @@ module.exports = {
     CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
+    RAZORPAY_KEY_ID,
+    RAZORPAY_KEY_SECRET,
 };
