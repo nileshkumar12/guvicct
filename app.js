@@ -14,6 +14,7 @@ const adminRouter = require("./routes/adminRouter");
 const paymentRoutes = require("./routes/paymentRoutes");
 const notificationRoutes = require('./routes/notificationRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
+const storeRoutes = require("./routes/storeRoutes");
 const cors = require("cors");
 const path = require("path");
 const app = express();
@@ -52,6 +53,6 @@ app.use("/api/payment", paymentRoutes);
 app.use('/api/seller/notifications', notificationRoutes);
 app.use('/api/seller/shipments', shipmentRoutes);
 app.use('/api/shipments', shipmentRoutes); 
-
+app.use("/api/stores", storeRoutes);
 
 module.exports =app;

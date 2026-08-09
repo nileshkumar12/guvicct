@@ -45,65 +45,9 @@ const userSchema = new mongoose.Schema({
     },
 
     store: {
-      storeName: {
-        type: String,
-      },
-
-      storeDescription: {
-        type: String,
-      },
-
-      sellerName: {
-        type: String,
-      },
-
-      email: {
-        type: String,
-      },
-
-      phone: {
-        type: String,
-      },
-
-      category: {
-        type: String,
-      },
-
-      gstin: {
-        type: String,
-      },
-
-      pan: {
-        type: String,
-      },
-
-      address: {
-        type: String,
-      },
-
-      city: {
-        type: String,
-      },
-
-      state: {
-        type: String,
-      },
-
-      pincode: {
-        type: String,
-      },
-
-      openingTime: {
-        type: String,
-      },
-
-      closingTime: {
-        type: String,
-      },
-
-      storeLogo: {
-        type: String,
-      },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Store",
+      default: null,
     },
   },
   {
