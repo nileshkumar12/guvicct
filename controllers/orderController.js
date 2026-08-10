@@ -106,7 +106,7 @@ const normalizeOrderItems = async (items) => {
      * Get product from database
      */
     const product = await Product.findById(incomingProductId).select(
-      "_id name price seller stock"
+      "_id name price seller store stock"
     );
 
     if (!product) {
@@ -179,8 +179,12 @@ const normalizeOrderItems = async (items) => {
      */
     orderItems.push({
       product: product._id,
+      seller: product.seller,
+      store: product.store,
+      productName: product.name,
       quantity,
       price,
+      total: price * quantity,
     });
 
     /**
