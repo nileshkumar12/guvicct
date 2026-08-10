@@ -118,6 +118,26 @@ const normalizeOrderItems = async (items) => {
       throw error;
     }
 
+    // Legacy product documents may miss seller/store fields.
+    // Return a client error instead of failing later with a 500.
+    if (!product.seller || !isValidObjectId(product.seller)) {
+      const error = new Error(
+        `Product seller is missing for product: ${product.name}`
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
+    if (!product.store || !isValidObjectId(product.store)) {
+      const error = new Error(
+        `Product store is missing for product: ${product.name}`
+      );
+
+      error.status = 400;
+      throw error;
+    }
+
     /**
      * Validate quantity
      */
@@ -437,9 +457,17 @@ exports.placeOrder = async (req, res) => {
         })
       );
 
-      await SellerNotification.insertMany(
-        notifications
-      );
+      try {
+        await SellerNotification.insertMany(
+          notifications
+        );
+      } catch (notifyError) {
+        // Notification issues should not fail order placement.
+        console.error(
+          "Seller notification error:",
+          notifyError
+        );
+      }
     }
 
     /**
@@ -513,6 +541,18 @@ exports.buyerOrders = async (req, res) => {
   try {
     const userId = getUserId(req);
 
+    // Seller dashboard in some clients calls /api/orders with seller context.
+    // Route it to seller order listing to avoid wrong handler usage.
+    if (
+      req.user?.role === "seller" ||
+      req.query?.sellerId
+    ) {
+      return exports.sellerOrders(
+        req,
+        res
+      );
+    }
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -539,7 +579,9 @@ exports.buyerOrders = async (req, res) => {
       error
     );
 
-    return res.status(500).json({
+    return res.status(
+      error.status || 500
+    ).json({
       success: false,
       message:
         error.message ||
