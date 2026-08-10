@@ -1,19 +1,59 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const auth = require('../middleware/auth');
+
 const {
   placeOrder,
   buyerOrders,
   orderDetails,
+  sellerOrders,
+  updateSellerOrderStatus,
+  adminOrders,
+  adminOrderDetails,
   cancelOrder,
   deleteBuyerOrderHistory,
-} = require('../controllers/orderController');
+} = require("../controllers/orderController");
 
-router.post('/', auth, placeOrder);
-router.get('/buyer-orders', auth, buyerOrders);
-router.get('/', auth, buyerOrders);
-router.get('/:id', auth, orderDetails);
-router.put('/:id/cancel', auth, cancelOrder);
-router.delete('/:id', auth, deleteBuyerOrderHistory);
+const authMiddleware = require("../middleware/authMiddleware");
+
+// Buyer
+router.post("/", authMiddleware, placeOrder);
+
+router.get("/", authMiddleware, buyerOrders);
+
+router.get("/:id", authMiddleware, orderDetails);
+
+router.put("/:id/cancel", authMiddleware, cancelOrder);
+
+router.delete(
+  "/:id/history",
+  authMiddleware,
+  deleteBuyerOrderHistory
+);
+
+// Seller
+router.get(
+  "/seller/orders",
+  authMiddleware,
+  sellerOrders
+);
+
+router.put(
+  "/seller/orders/:id/status",
+  authMiddleware,
+  updateSellerOrderStatus
+);
+
+// Admin
+router.get(
+  "/admin/orders",
+  authMiddleware,
+  adminOrders
+);
+
+router.get(
+  "/admin/orders/:id",
+  authMiddleware,
+  adminOrderDetails
+);
 
 module.exports = router;
