@@ -167,12 +167,10 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-orderSchema.pre("validate", function (next) {
+orderSchema.pre("validate", function () {
   if (!this.orderNumber) {
     this.orderNumber = generateOrderNumber();
   }
-
-  next();
 });
 
 module.exports = mongoose.model("Order", orderSchema);
