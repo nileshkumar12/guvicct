@@ -45,11 +45,62 @@ const normalizeOrderItems = async (items) => {
   return { orderItems, subtotal };
 };*/
 
+// const normalizeOrderItems = async (items) => {
+//   const orderItems = [];
+//   let subtotal = 0;
+
+
+//   const sellerIds = new Set();
+
+//   for (const item of items) {
+//     const incomingProductId =
+//       item?.productId ||
+//       item?.product ||
+//       item?._id;
+
+//     const product = await Product.findById(
+//       incomingProductId
+//     ).select("_id name price seller");
+
+//     if (!product) {
+//       const error = new Error(
+//         `Product not found: ${incomingProductId}`
+//       );
+
+//       error.status = 404;
+//       throw error;
+//     }
+
+//     const quantity = Number(item.quantity) || 1;
+
+//     const price = Number.isFinite(Number(item.price))
+//       ? Number(item.price)
+//       : product.price;
+
+//     subtotal += price * quantity;
+
+//     orderItems.push({
+//       product: product._id,
+//       quantity,
+//       price,
+//     });
+
+ 
+//     if (product.seller) {
+//       sellerIds.add(String(product.seller));
+//     }
+//   }
+
+//   return {
+//     orderItems,
+//     subtotal,
+//     sellerIds: [...sellerIds],
+//   };
+// };
+
 const normalizeOrderItems = async (items) => {
   const orderItems = [];
   let subtotal = 0;
-
-  // Store unique seller IDs
   const sellerIds = new Set();
 
   for (const item of items) {
@@ -58,24 +109,48 @@ const normalizeOrderItems = async (items) => {
       item?.product ||
       item?._id;
 
-    const product = await Product.findById(
-      incomingProductId
-    ).select("_id name price seller");
+    if (!incomingProductId) {
+      const error = new Error("Product ID is required");
+      error.status = 400;
+      throw error;
+    }
+
+    const product = await Product.findById(incomingProductId)
+      .select("_id name price seller stock");
 
     if (!product) {
       const error = new Error(
         `Product not found: ${incomingProductId}`
       );
-
       error.status = 404;
       throw error;
     }
 
-    const quantity = Number(item.quantity) || 1;
+    const quantity = Number(item.quantity);
 
-    const price = Number.isFinite(Number(item.price))
-      ? Number(item.price)
-      : product.price;
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      const error = new Error(
+        `Invalid quantity for product: ${product.name}`
+      );
+      error.status = 400;
+      throw error;
+    }
+
+    // Optional stock validation
+    if (
+      product.stock !== undefined &&
+      quantity > product.stock
+    ) {
+      const error = new Error(
+        `Insufficient stock for product: ${product.name}`
+      );
+      error.status = 400;
+      throw error;
+    }
+
+    // IMPORTANT:
+    // Always use price from database.
+    const price = Number(product.price) || 0;
 
     subtotal += price * quantity;
 
@@ -85,7 +160,6 @@ const normalizeOrderItems = async (items) => {
       price,
     });
 
-    // Collect seller
     if (product.seller) {
       sellerIds.add(String(product.seller));
     }
