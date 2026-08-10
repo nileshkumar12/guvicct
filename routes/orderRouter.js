@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
+const authMiddleware = require("../middleware/authMiddleware");
+
 const {
   placeOrder,
   buyerOrders,
@@ -13,8 +15,6 @@ const {
   deleteBuyerOrderHistory,
 } = require("../controllers/orderController");
 
-const authMiddleware = require("../middleware/authMiddleware");
-
 // Buyer
 router.post("/", authMiddleware, placeOrder);
 
@@ -22,7 +22,11 @@ router.get("/", authMiddleware, buyerOrders);
 
 router.get("/:id", authMiddleware, orderDetails);
 
-router.put("/:id/cancel", authMiddleware, cancelOrder);
+router.put(
+  "/:id/cancel",
+  authMiddleware,
+  cancelOrder
+);
 
 router.delete(
   "/:id/history",
