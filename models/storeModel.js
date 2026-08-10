@@ -28,6 +28,11 @@ const storeSchema = new mongoose.Schema(
       default: "",
     },
 
+     category: {
+      type: String,
+      default: "",
+    },
+
     banner: {
       type: String,
       default: "",
@@ -56,10 +61,17 @@ const storeSchema = new mongoose.Schema(
       pincode: { type: String, default: "" },
     },
 
+     panNumber: {
+      type: String,
+      default: "",
+    },
+
     gstNumber: {
       type: String,
       default: "",
     },
+
+
 
     status: {
       type: String,
@@ -70,6 +82,16 @@ const storeSchema = new mongoose.Schema(
     rating: {
       type: Number,
       default: 0,
+    },
+
+     openingTime: {
+      type: String,
+      default: "",
+    },
+
+    closingTime: {
+      type: String,
+      default: "",
     },
 
     totalReviews: {

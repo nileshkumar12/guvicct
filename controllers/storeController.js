@@ -14,6 +14,10 @@ exports.createStore = async (req, res) => {
       email,
       address,
       gstNumber,
+      category,
+      panNumber,
+      openingTime,
+      closingTime,
     } = req.body;
 
 
@@ -194,6 +198,10 @@ exports.updateMyStore = async (req, res) => {
       email,
       address,
       gstNumber,
+       category,
+      panNumber,
+      openingTime,
+      closingTime,
     } = req.body;
 
     const store = await Store.findOne({
@@ -255,6 +263,23 @@ exports.updateMyStore = async (req, res) => {
     if (gstNumber !== undefined) {
       store.gstNumber = gstNumber;
     }
+
+    if (category !== undefined) {
+      store.category = category;
+    } 
+
+     if (closingTime !== undefined) {
+      store.closingTime = closingTime;
+    } 
+
+     if (openingTime !== undefined) {
+      store.openingTime = openingTime;
+    } 
+
+     if (panNumber !== undefined) {
+      store.panNumber = panNumber;
+    } 
+
 
     await store.save();
 
