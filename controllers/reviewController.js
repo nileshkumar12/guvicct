@@ -7,7 +7,7 @@ const Order = require("../models/orderModel");
 // create a new review
 exports.createReview = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?._id || req.user?.id;
     const { productId } = req.params;
 
     const {
@@ -99,7 +99,19 @@ exports.createReview = async (req, res) => {
       });
     }
 
-    // Check buyer purchased product
+    const productObjectId = mongoose.Types.ObjectId.isValid(productId)
+      ? new mongoose.Types.ObjectId(productId)
+      : null;
+
+    if (!productObjectId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product ID",
+      });
+    }
+
+    // Optional purchase validation for verified reviews.
+    // Do not block product-page reviews when the user has not placed an order yet.
     const order = await Order.findOne({
       $and: [
         {
@@ -109,21 +121,15 @@ exports.createReview = async (req, res) => {
           ],
         },
         {
-          "items.product": productId,
+          "items.product": productObjectId,
         },
         {
-          status: { $regex: /^delivered$/i },
+          status: { $nin: ["Cancelled", "cancelled"] },
         },
       ],
-    }).select("_id items");
+    }).select("_id items status");
 
-    if (!order) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You can review this product only after receiving it.",
-      });
-    }
+    const isVerifiedPurchase = Boolean(order);
 
     // Create review
     const review = await Review.create({
@@ -145,7 +151,7 @@ exports.createReview = async (req, res) => {
         ? images
         : [],
 
-      verifiedPurchase: true,
+      verifiedPurchase: isVerifiedPurchase,
 
       status: "APPROVED",
     });
