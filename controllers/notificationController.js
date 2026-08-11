@@ -15,7 +15,7 @@ exports.getSellerNotifications = async (req, res) => {
 exports.markNotificationRead = async (req, res) => {
   try {
     const notification = await SellerNotification.findOneAndUpdate(
-      { _id: req.params.notificationId, seller: req.user._id }, // ✅ "seller"
+      { _id: req.params.notificationId, seller: req.user._id }, 
       { isRead: true },
       { new: true }
     );

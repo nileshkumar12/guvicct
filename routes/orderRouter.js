@@ -17,35 +17,14 @@ const {
 
 // Buyer
 router.post("/", authMiddleware, placeOrder);
-
 router.get("/", authMiddleware, buyerOrders);
-
 router.get("/:id", authMiddleware, orderDetails);
-
-router.put(
-  "/:id/cancel",
-  authMiddleware,
-  cancelOrder
-);
-
-router.delete(
-  "/:id/history",
-  authMiddleware,
-  deleteBuyerOrderHistory
-);
+router.put( "/:id/cancel", authMiddleware, cancelOrder);
+router.delete( "/:id/history", authMiddleware, deleteBuyerOrderHistory);
 
 // Seller
-router.get(
-  "/seller/orders",
-  authMiddleware,
-  sellerOrders
-);
-
-router.put(
-  "/seller/orders/:id/status",
-  authMiddleware,
-  updateSellerOrderStatus
-);
+router.get(  "/seller/orders", authMiddleware, sellerOrders);
+router.put( "/seller/orders/:id/status", authMiddleware, updateSellerOrderStatus);
 
 // Admin
 router.get(

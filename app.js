@@ -1,4 +1,3 @@
-
 const express = require("express");
 const userRouter = require("./routes/userRouter");
 const invoiceRouter = require("./routes/invoiceRouter");
@@ -15,6 +14,7 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const notificationRoutes = require('./routes/notificationRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
 const storeRoutes = require("./routes/storeRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 const cors = require("cors");
 const path = require("path");
 const app = express();
@@ -29,14 +29,6 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const logger = require('./utils/logger');
-// const errorRouter = require('./utils/errorRoute');
-
-// middleware to log all the incoming requests
-// app.use(morgan("dev"));
-// app.use(logger);
-
-// middleware to send response handling error routes
-// app.use(errorRouter);
 
 app.use("/api/auth", authRouter);
 app.use("/api/products", productRouter);
@@ -44,7 +36,7 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/brands", brandRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/cart", cartRouter);
-app.use("/api/wish  list", wishlistRouter);
+app.use("/api/wishlist", wishlistRouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/admin", adminRouter);
 app.use("/users", userRouter);
@@ -54,5 +46,5 @@ app.use('/api/seller/notifications', notificationRoutes);
 app.use('/api/seller/shipments', shipmentRoutes);
 app.use('/api/shipments', shipmentRoutes); 
 app.use("/api/stores", storeRoutes);
-
+app.use("/api/reviews", reviewRoutes);
 module.exports =app;
