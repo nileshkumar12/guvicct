@@ -101,9 +101,20 @@ exports.createReview = async (req, res) => {
 
     // Check buyer purchased product
     const order = await Order.findOne({
-      buyer: userId,
-      "items.product": productId,
-      status: "DELIVERED",
+      $and: [
+        {
+          $or: [
+            { user: userId },
+            { buyer: userId },
+          ],
+        },
+        {
+          "items.product": productId,
+        },
+        {
+          status: { $regex: /^delivered$/i },
+        },
+      ],
     }).select("_id items");
 
     if (!order) {

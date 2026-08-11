@@ -46,5 +46,5 @@ app.use('/api/seller/notifications', notificationRoutes);
 app.use('/api/seller/shipments', shipmentRoutes);
 app.use('/api/shipments', shipmentRoutes); 
 app.use("/api/stores", storeRoutes);
-app.use("/api/reviews", reviewRoutes);
+app.use("/api", reviewRoutes);
 module.exports =app;
