@@ -470,20 +470,30 @@ exports.placeOrder = async (req, res) => {
         );
       }
     }
+// Send confirmation email
+try {
+  console.log("📧 Preparing order confirmation email...");
 
-    // Send confirmation email
-    if (sellerIds.size > 0) {
-      try {
-        await sendOrderConfirmationEmail(
-          await Order.findById(order._id)
-            .populate("user", "name email")
-            .populate("items.product", "name")
-        );
-      } catch (emailError) {
-        console.error("Order email failed:", emailError.message);
-      }
+  const populatedOrder = await Order.findById(order._id)
+    .populate("user", "name email")
+    .populate("items.product", "name");
 
-    }
+  console.log("📧 Customer email:", populatedOrder?.user?.email);
+  console.log("📧 Order number:", populatedOrder?.orderNumber);
+
+  if (!populatedOrder?.user?.email) {
+    console.error("❌ Customer email not found");
+  } else {
+    const emailResult =
+      await sendOrderConfirmationEmail(populatedOrder);
+
+    console.log("✅ Order confirmation email sent");
+    console.log("📧 Message ID:", emailResult?.messageId);
+  }
+} catch (emailError) {
+  console.error("❌ Order email failed:");
+  console.error(emailError);
+}
     /**
      * -----------------------------------------------------
      * RESPONSE
