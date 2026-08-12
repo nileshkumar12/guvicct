@@ -450,32 +450,58 @@ res.status(201).json({
 
 
 // SEND EMAIL IN BACKGROUND
-setImmediate(async () => {
-  try {
-    console.log("📧 Sending order confirmation email...");
+console.log("✅ ORDER CREATED:", order.orderNumber);
 
-    const emailOrder = await Order.findById(order._id)
-      .populate("user", "name email");
 
-    if (!emailOrder?.user?.email) {
-      console.error("❌ Customer email not found");
-      return;
-    }
+// =====================================================
+// GET POPULATED ORDER
+// =====================================================
 
-    await sendOrderConfirmationEmail(emailOrder);
+const populatedOrder = await Order.findById(order._id)
+  .populate("user", "name email");
 
-    console.log(
-      "✅ Order confirmation email sent:",
-      emailOrder.orderNumber
-    );
+console.log(
+  " customer email:",
+  populatedOrder?.user?.email
+);
 
-  } catch (error) {
-    console.error(
-      "❌ Background email failed:",
-      error.message
-    );
-  }
-});
+
+// =====================================================
+// START EMAIL - DO NOT AWAIT
+// =====================================================
+
+if (populatedOrder?.user?.email) {
+
+  sendOrderConfirmationEmail(populatedOrder)
+    .then((info) => {
+
+      console.log(
+        "Order email sent:",
+        populatedOrder.orderNumber
+      );
+
+      console.log(
+        "message id:",
+        info?.messageId
+      );
+
+    })
+    .catch((error) => {
+
+      console.error(
+        "order error:",
+        error.message
+      );
+
+    });
+
+} else {
+
+  console.error(
+    "EMAIL NOT SENT - USER EMAIL NOT FOUND"
+  );
+
+}
 
     /**
      * -----------------------------------------------------
