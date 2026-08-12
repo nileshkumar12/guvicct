@@ -17,6 +17,8 @@ const CLOUDINARY_API_KEY = normalizeEnv(process.env.CLOUDINARY_API_KEY);
 const CLOUDINARY_API_SECRET = normalizeEnv(process.env.CLOUDINARY_API_SECRET);
 const RAZORPAY_KEY_ID = normalizeEnv(process.env.RAZORPAY_KEY_ID);
 const RAZORPAY_KEY_SECRET = normalizeEnv(process.env.RAZORPAY_KEY_SECRET);
+const EMAIL_USER = normalizeEnv(process.env.EMAIL_USER);
+const EMAIL_PASS = normalizeEnv(process.env.EMAIL_PASS);
 
 module.exports = {
     MONGODB_URI,
@@ -27,4 +29,6 @@ module.exports = {
     CLOUDINARY_API_SECRET,
     RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET,
+    EMAIL_USER,
+    EMAIL_PASS,
 };

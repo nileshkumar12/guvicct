@@ -5,7 +5,7 @@ const Order = require("../models/orderModel");
 const Product = require("../models/productModel");
 const User = require("../models/userModel");
 const SellerNotification = require("../models/sellerNotificationModel");
-const { sendOrderConfirmationEmail, sendShipmentUpdateEmail } = require("../utils/sendEmail");
+const { sendOrderConfirmationEmail } = require("../utils/sendEmail");
 
 const ORDER_STATUS = [
   "Pending",
@@ -434,74 +434,21 @@ exports.placeOrder = async (req, res) => {
       total,
     });
 
-// =====================================================
-// SEND BUYER ORDER CONFIRMATION EMAIL
-// =====================================================
+    const populatedOrder =
+      await Order.findById(order._id)
+        .populate(
+          "user",
+          "name email"
+        )
+        .populate(
+          "items.product",
+          "name price image"
+        );
 
-const responseOrder = await Order.findById(order._id)
-  .populate("user", "name email");
-
-// Return response immediately
-res.status(201).json({
-  success: true,
-  message: "Order placed successfully",
-  order: responseOrder,
-});
-
-
-// SEND EMAIL IN BACKGROUND
-console.log("✅ ORDER CREATED:", order.orderNumber);
-
-
-// =====================================================
-// GET POPULATED ORDER
-// =====================================================
-
-const populatedOrder = await Order.findById(order._id)
-  .populate("user", "name email");
-
-console.log(
-  " customer email:",
-  populatedOrder?.user?.email
-);
-
-
-// =====================================================
-// START EMAIL - DO NOT AWAIT
-// =====================================================
-
-if (populatedOrder?.user?.email) {
-
-  sendOrderConfirmationEmail(populatedOrder)
-    .then((info) => {
-
-      console.log(
-        "Order email sent:",
-        populatedOrder.orderNumber
-      );
-
-      console.log(
-        "message id:",
-        info?.messageId
-      );
-
-    })
-    .catch((error) => {
-
-      console.error(
-        "order error:",
-        error.message
-      );
-
-    });
-
-} else {
-
-  console.error(
-    "EMAIL NOT SENT - USER EMAIL NOT FOUND"
-  );
-
-}
+    console.log(
+      "Order created:",
+      order.orderNumber
+    );
 
     /**
      * -----------------------------------------------------
@@ -539,6 +486,33 @@ if (populatedOrder?.user?.email) {
         );
       }
     }
+
+    if (populatedOrder?.user?.email) {
+      sendOrderConfirmationEmail(
+        populatedOrder
+      )
+        .then((info) => {
+          console.log(
+            "Order confirmation email sent:",
+            populatedOrder.orderNumber
+          );
+
+          console.log(
+            "Message ID:",
+            info?.messageId
+          );
+        })
+        .catch((emailError) => {
+          console.error(
+            "Order confirmation email error:",
+            emailError.message
+          );
+        });
+    } else {
+      console.error(
+        "Order confirmation email skipped: user email not found"
+      );
+    }
    
     /**
      * -----------------------------------------------------
@@ -551,39 +525,7 @@ if (populatedOrder?.user?.email) {
       success: true,
       message: "Order placed successfully",
 
-      order: {
-        _id: order._id,
-
-        orderNumber:
-          order.orderNumber,
-
-        subtotal:
-          order.subtotal,
-
-        discount:
-          order.discount,
-
-        shippingCost:
-          order.shippingCost,
-
-        tax:
-          order.tax,
-
-        total:
-          order.total,
-
-        paymentMethod:
-          order.paymentMethod,
-
-        status:
-          order.status,
-
-        shippingAddress:
-          order.shippingAddress,
-
-        createdAt:
-          order.createdAt,
-      },
+      order: populatedOrder || order,
     });
   } catch (error) {
     console.error(
