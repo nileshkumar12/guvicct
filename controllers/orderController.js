@@ -434,6 +434,14 @@ exports.placeOrder = async (req, res) => {
       total,
     });
 
+
+console.log("Order ID:", order._id);
+console.log("Order Number:", order.orderNumber);
+console.log("User ID:", userId);
+console.log("Populated Order User:", populatedOrder?.user);
+console.log("User Email:", populatedOrder?.user?.email);
+console.log("Order Items:", populatedOrder?.items?.length);
+
     const populatedOrder =
       await Order.findById(order._id)
         .populate(
