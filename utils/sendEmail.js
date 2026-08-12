@@ -5,14 +5,6 @@ const nodemailer = require("nodemailer");
 // =====================================================
 
 const getTransporter = () => {
-  if (!process.env.EMAIL_USER) {
-    throw new Error("EMAIL_USER is not configured");
-  }
-
-  if (!process.env.EMAIL_PASS) {
-    throw new Error("EMAIL_PASS is not configured");
-  }
-
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -25,46 +17,30 @@ const getTransporter = () => {
 };
 
 // =====================================================
-// Send Order Confirmation Email
+// Order Confirmation Email
 // =====================================================
 
 const sendOrderConfirmationEmail = async (order) => {
   try {
-    console.log("========================================");
-    console.log("📧 ORDER EMAIL START");
-    console.log("========================================");
-
     if (!order) {
       throw new Error("Order data is missing");
     }
 
-    // -----------------------------------------
-    // Get customer email
-    // -----------------------------------------
+    const email = order.user?.email;
 
-    const customerEmail =
-      order.user?.email || order.customerEmail || null;
-
-    if (!customerEmail) {
-      throw new Error(
-        "Recipient email is missing from order.user.email"
-      );
+    if (!email) {
+      throw new Error("Recipient email is missing");
     }
 
-    console.log("📧 Recipient:", customerEmail);
-    console.log("📦 Order:", order.orderNumber);
-
-    // -----------------------------------------
-    // Order items
-    // -----------------------------------------
-
-    if (!Array.isArray(order.items) || order.items.length === 0) {
+    if (!Array.isArray(order.items)) {
       throw new Error("Order items are missing");
     }
 
+    console.log("📧 Sending order email to:", email);
+    console.log("📦 Order:", order.orderNumber);
+
     const itemsHtml = order.items
       .map((item) => {
-        // Your schema stores productName directly
         const productName =
           item.productName ||
           item.product?.name ||
@@ -74,48 +50,38 @@ const sendOrderConfirmationEmail = async (order) => {
 
         const price = Number(item.price || 0);
 
-        const itemTotal = Number(
+        const total = Number(
           item.total || price * quantity
         );
 
         return `
           <tr>
-            <td
-              style="
-                padding:12px;
-                border-bottom:1px solid #e5e7eb;
-              "
-            >
+            <td style="
+              padding:12px;
+              border-bottom:1px solid #ddd;
+            ">
               ${productName}
             </td>
 
-            <td
-              style="
-                padding:12px;
-                border-bottom:1px solid #e5e7eb;
-                text-align:center;
-              "
-            >
+            <td style="
+              padding:12px;
+              border-bottom:1px solid #ddd;
+              text-align:center;
+            ">
               ${quantity}
             </td>
 
-            <td
-              style="
-                padding:12px;
-                border-bottom:1px solid #e5e7eb;
-                text-align:right;
-              "
-            >
-              ₹${itemTotal.toFixed(2)}
+            <td style="
+              padding:12px;
+              border-bottom:1px solid #ddd;
+              text-align:right;
+            ">
+              ₹${total.toFixed(2)}
             </td>
           </tr>
         `;
       })
       .join("");
-
-    // -----------------------------------------
-    // Shipping address
-    // -----------------------------------------
 
     const shippingAddress =
       order.shippingAddress || {};
@@ -145,14 +111,10 @@ const sendOrderConfirmationEmail = async (order) => {
     const country =
       shippingAddress.country || "";
 
-    // -----------------------------------------
-    // Create email
-    // -----------------------------------------
-
     const mailOptions = {
       from: `"Your Store" <${process.env.EMAIL_USER}>`,
 
-      to: customerEmail,
+      to: email,
 
       subject: `Order Confirmed - ${
         order.orderNumber || "Your Order"
@@ -160,15 +122,16 @@ const sendOrderConfirmationEmail = async (order) => {
 
       html: `
 <!DOCTYPE html>
+
 <html>
 
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
 
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
-  />
+  >
 
   <title>Order Confirmation</title>
 </head>
@@ -192,7 +155,7 @@ const sendOrderConfirmationEmail = async (order) => {
     "
   >
 
-    <!-- Header -->
+    <!-- HEADER -->
 
     <div
       style="
@@ -204,8 +167,8 @@ const sendOrderConfirmationEmail = async (order) => {
 
       <h1
         style="
-          color:#ffffff;
           margin:0;
+          color:#ffffff;
           font-size:26px;
         "
       >
@@ -215,23 +178,16 @@ const sendOrderConfirmationEmail = async (order) => {
     </div>
 
 
-    <!-- Content -->
+    <!-- CONTENT -->
 
     <div style="padding:25px;">
 
-      <p
-        style="
-          font-size:16px;
-          color:#111827;
-        "
-      >
+      <p style="font-size:16px;">
         Hello ${customerName},
       </p>
 
-
       <p
         style="
-          font-size:15px;
           color:#374151;
           line-height:1.6;
         "
@@ -241,7 +197,7 @@ const sendOrderConfirmationEmail = async (order) => {
       </p>
 
 
-      <!-- Order Summary -->
+      <!-- ORDER SUMMARY -->
 
       <div
         style="
@@ -253,7 +209,7 @@ const sendOrderConfirmationEmail = async (order) => {
         "
       >
 
-        <p style="margin:0 0 8px 0;">
+        <p style="margin:0 0 8px;">
           <strong>Order Number:</strong>
           ${order.orderNumber || "-"}
         </p>
@@ -266,17 +222,9 @@ const sendOrderConfirmationEmail = async (order) => {
       </div>
 
 
-      <!-- Order Details -->
+      <!-- ORDER ITEMS -->
 
-      <h3
-        style="
-          color:#111827;
-          margin-top:30px;
-        "
-      >
-        Order Details
-      </h3>
-
+      <h3>Order Details</h3>
 
       <table
         width="100%"
@@ -327,7 +275,6 @@ const sendOrderConfirmationEmail = async (order) => {
 
         </thead>
 
-
         <tbody>
 
           ${itemsHtml}
@@ -337,17 +284,11 @@ const sendOrderConfirmationEmail = async (order) => {
       </table>
 
 
-      <!-- Shipping Address -->
+      <!-- SHIPPING ADDRESS -->
 
-      <h3
-        style="
-          color:#111827;
-          margin-top:30px;
-        "
-      >
+      <h3 style="margin-top:30px;">
         Shipping Address
       </h3>
-
 
       <div
         style="
@@ -360,19 +301,23 @@ const sendOrderConfirmationEmail = async (order) => {
         "
       >
 
-        <strong>${customerName}</strong><br />
+        <strong>${customerName}</strong>
 
-        ${line1}
+        ${
+          line1
+            ? `<br>${line1}`
+            : ""
+        }
 
         ${
           line2
-            ? `<br />${line2}`
+            ? `<br>${line2}`
             : ""
         }
 
         ${
           city
-            ? `<br />${city}`
+            ? `<br>${city}`
             : ""
         }
 
@@ -384,13 +329,13 @@ const sendOrderConfirmationEmail = async (order) => {
 
         ${
           postalCode
-            ? `<br />${postalCode}`
+            ? `<br>${postalCode}`
             : ""
         }
 
         ${
           country
-            ? `<br />${country}`
+            ? `<br>${country}`
             : ""
         }
 
@@ -407,11 +352,9 @@ const sendOrderConfirmationEmail = async (order) => {
         We will notify you when your order is shipped.
       </p>
 
-
       <p
         style="
           color:#374151;
-          line-height:1.6;
         "
       >
         Thank you for shopping with us!
@@ -420,7 +363,7 @@ const sendOrderConfirmationEmail = async (order) => {
     </div>
 
 
-    <!-- Footer -->
+    <!-- FOOTER -->
 
     <div
       style="
@@ -434,7 +377,7 @@ const sendOrderConfirmationEmail = async (order) => {
         style="
           margin:0;
           font-size:12px;
-          color:#6b7280;
+          color:#777;
         "
       >
         This is an automated email.
@@ -451,29 +394,23 @@ const sendOrderConfirmationEmail = async (order) => {
       `,
     };
 
-    // -----------------------------------------
-    // Send email
-    // -----------------------------------------
-
     const transporter = getTransporter();
 
     const info =
       await transporter.sendMail(mailOptions);
 
-    console.log("========================================");
-    console.log("✅ ORDER EMAIL SENT");
-    console.log("📧 To:", customerEmail);
+    console.log("✅ Order confirmation email sent");
+    console.log("📧 To:", email);
     console.log("📦 Order:", order.orderNumber);
     console.log("🆔 Message ID:", info.messageId);
-    console.log("========================================");
 
     return info;
 
   } catch (error) {
 
-    console.error("========================================");
-    console.error("❌ ORDER EMAIL FAILED");
-    console.error("========================================");
+    console.error(
+      "❌ Order confirmation email failed:"
+    );
 
     console.error("Message:", error.message);
     console.error("Code:", error.code);
@@ -485,7 +422,7 @@ const sendOrderConfirmationEmail = async (order) => {
 
 
 // =====================================================
-// Send Shipment Update Email
+// Shipment Update Email
 // =====================================================
 
 const sendShipmentUpdateEmail = async ({
@@ -524,16 +461,7 @@ const sendShipmentUpdateEmail = async ({
 <html>
 
 <head>
-
-  <meta charset="UTF-8" />
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-
-  <title>Shipment Update</title>
-
+  <meta charset="UTF-8">
 </head>
 
 <body
@@ -548,27 +476,20 @@ const sendShipmentUpdateEmail = async ({
   <div
     style="
       max-width:650px;
-      margin:0 auto;
+      margin:auto;
       background:#ffffff;
       padding:25px;
       border-radius:10px;
     "
   >
 
-    <h2
-      style="
-        color:#2563eb;
-        margin-top:0;
-      "
-    >
+    <h2 style="color:#2563eb;">
       Shipment Update 📦
     </h2>
-
 
     <p>
       Hello ${name || "Customer"},
     </p>
-
 
     <p>
       Your order
@@ -576,27 +497,25 @@ const sendShipmentUpdateEmail = async ({
       has been updated.
     </p>
 
-
     <div
       style="
         background:#f3f4f6;
         padding:18px;
         border-radius:8px;
-        margin:20px 0;
         line-height:1.8;
       "
     >
 
       <strong>Status:</strong>
       ${status || "-"}
-      <br />
+      <br>
 
       ${
         carrier
           ? `
             <strong>Carrier:</strong>
             ${carrier}
-            <br />
+            <br>
           `
           : ""
       }
@@ -612,21 +531,8 @@ const sendShipmentUpdateEmail = async ({
 
     </div>
 
-
     <p>
       Thank you for shopping with us!
-    </p>
-
-
-    <p
-      style="
-        font-size:12px;
-        color:#777;
-        margin-top:30px;
-      "
-    >
-      This is an automated email.
-      Please do not reply to this email.
     </p>
 
   </div>
@@ -643,11 +549,7 @@ const sendShipmentUpdateEmail = async ({
       );
 
     console.log(
-      "✅ Shipment update email sent"
-    );
-
-    console.log(
-      "Message ID:",
+      "✅ Shipment update email sent:",
       info.messageId
     );
 
@@ -656,19 +558,14 @@ const sendShipmentUpdateEmail = async ({
   } catch (error) {
 
     console.error(
-      "❌ Shipment update email failed:"
+      "❌ Shipment update email failed:",
+      error.message
     );
-
-    console.error(error);
 
     throw error;
   }
 };
 
-
-// =====================================================
-// Export
-// =====================================================
 
 module.exports = {
   sendOrderConfirmationEmail,

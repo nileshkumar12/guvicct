@@ -438,49 +438,44 @@ exports.placeOrder = async (req, res) => {
 // SEND BUYER ORDER CONFIRMATION EMAIL
 // =====================================================
 
-try {
-  console.log("📧 Starting buyer order confirmation email...");
+const responseOrder = await Order.findById(order._id)
+  .populate("user", "name email");
 
-  const populatedOrder = await Order.findById(order._id)
-    .populate("user", "name email");
+// Return response immediately
+res.status(201).json({
+  success: true,
+  message: "Order placed successfully",
+  order: responseOrder,
+});
 
-  console.log(
-    "📧 Buyer email:",
-    populatedOrder?.user?.email
-  );
 
-  console.log(
-    "📦 Order number:",
-    populatedOrder?.orderNumber
-  );
+// SEND EMAIL IN BACKGROUND
+setImmediate(async () => {
+  try {
+    console.log("📧 Sending order confirmation email...");
 
-  if (!populatedOrder?.user?.email) {
+    const emailOrder = await Order.findById(order._id)
+      .populate("user", "name email");
 
-    console.error(
-      "❌ Cannot send email: buyer email not found"
-    );
+    if (!emailOrder?.user?.email) {
+      console.error("❌ Customer email not found");
+      return;
+    }
 
-  } else {
-
-    await sendOrderConfirmationEmail(
-      populatedOrder
-    );
+    await sendOrderConfirmationEmail(emailOrder);
 
     console.log(
-      "✅ Buyer order confirmation email completed"
+      "✅ Order confirmation email sent:",
+      emailOrder.orderNumber
+    );
+
+  } catch (error) {
+    console.error(
+      "❌ Background email failed:",
+      error.message
     );
   }
-
-} catch (emailError) {
-
-  console.error(
-    "❌ Buyer confirmation email failed:"
-  );
-
-  console.error(
-    emailError.message
-  );
-}
+});
 
     /**
      * -----------------------------------------------------
