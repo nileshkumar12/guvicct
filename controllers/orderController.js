@@ -440,8 +440,8 @@ exports.placeOrder = async (req, res) => {
      * -----------------------------------------------------
      */
 
-    if (sellerIds.size > 0) {
-      const notifications = [...sellerIds].map(
+    if (sellerIds.length > 0) {
+      const notifications = sellerIds.map(
         (sellerId) => ({
           seller: sellerId,
 
@@ -470,30 +470,17 @@ exports.placeOrder = async (req, res) => {
         );
       }
     }
-// Send confirmation email
-try {
-  console.log("📧 Preparing order confirmation email...");
-
-  const populatedOrder = await Order.findById(order._id)
-    .populate("user", "name email")
-    .populate("items.product", "name");
-
-  console.log("📧 Customer email:", populatedOrder?.user?.email);
-  console.log("📧 Order number:", populatedOrder?.orderNumber);
-
-  if (!populatedOrder?.user?.email) {
-    console.error("❌ Customer email not found");
-  } else {
-    const emailResult =
-      await sendOrderConfirmationEmail(populatedOrder);
-
-    console.log("✅ Order confirmation email sent");
-    console.log("📧 Message ID:", emailResult?.messageId);
-  }
-} catch (emailError) {
-  console.error("❌ Order email failed:");
-  console.error(emailError);
-}
+    // Fire email after response — do not block order placement
+    Order.findById(order._id)
+      .populate("user", "name email")
+      .populate("items.product", "name")
+      .then((populatedOrder) => {
+        if (populatedOrder?.user?.email) {
+          return sendOrderConfirmationEmail(populatedOrder);
+        }
+        console.error("❌ Customer email not found for order", order.orderNumber);
+      })
+      .catch((err) => console.error("❌ Order email failed:", err.message));
     /**
      * -----------------------------------------------------
      * RESPONSE
