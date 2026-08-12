@@ -5,6 +5,7 @@ const Order = require("../models/orderModel");
 const Product = require("../models/productModel");
 const User = require("../models/userModel");
 const SellerNotification = require("../models/sellerNotificationModel");
+const { sendOrderConfirmationEmail } = require("../utils/sendEmail");
 
 const ORDER_STATUS = [
   "Pending",
@@ -470,11 +471,25 @@ exports.placeOrder = async (req, res) => {
       }
     }
 
+    // Send confirmation email
+    if (sellerIds.length > 0) {
+      try {
+        await sendOrderConfirmationEmail(
+          await Order.findById(order._id)
+            .populate("user", "name email")
+            .populate("items.product", "name")
+        );
+      } catch (emailError) {
+        console.error("Order email failed:", emailError.message);
+      }
+
+    }
     /**
      * -----------------------------------------------------
      * RESPONSE
      * -----------------------------------------------------
      */
+    
 
     return res.status(201).json({
       success: true,

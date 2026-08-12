@@ -1,5 +1,7 @@
 const Shipment = require('../models/Shipment');
 const Order = require('../models/orderModel');
+const User = require('../models/userModel');
+const { sendShipmentUpdateEmail } = require('../utils/sendEmail');
 
 // POST /api/seller/shipments
 exports.createShipment = async (req, res) => {
@@ -60,7 +62,23 @@ exports.updateShipmentStatus = async (req, res) => {
     shipment.statusHistory.push({ status, note, updatedAt: new Date() });
     await shipment.save();
 
-    await Order.findByIdAndUpdate(shipment.orderId, { status });
+    const updatedOrder = await Order.findByIdAndUpdate(shipment.orderId, { status }, { new: true })
+      .populate('user', 'name email');
+
+    if (updatedOrder?.user?.email) {
+      try {
+        await sendShipmentUpdateEmail({
+          email: updatedOrder.user.email,
+          name: updatedOrder.user.name,
+          orderNumber: updatedOrder.orderNumber,
+          status,
+          trackingNumber: shipment.trackingNumber,
+          carrier: shipment.carrier,
+        });
+      } catch (emailErr) {
+        console.error('Shipment email failed:', emailErr.message);
+      }
+    }
 
     res.json({ success: true, shipment });
   } catch (err) {
