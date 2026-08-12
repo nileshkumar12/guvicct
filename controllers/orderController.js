@@ -5,7 +5,7 @@ const Order = require("../models/orderModel");
 const Product = require("../models/productModel");
 const User = require("../models/userModel");
 const SellerNotification = require("../models/sellerNotificationModel");
-const { sendOrderConfirmationEmail } = require("../utils/sendEmail");
+const { sendOrderConfirmationEmail, sendShipmentUpdateEmail } = require("../utils/sendEmail");
 
 const ORDER_STATUS = [
   "Pending",
@@ -434,6 +434,54 @@ exports.placeOrder = async (req, res) => {
       total,
     });
 
+// =====================================================
+// SEND BUYER ORDER CONFIRMATION EMAIL
+// =====================================================
+
+try {
+  console.log("📧 Starting buyer order confirmation email...");
+
+  const populatedOrder = await Order.findById(order._id)
+    .populate("user", "name email");
+
+  console.log(
+    "📧 Buyer email:",
+    populatedOrder?.user?.email
+  );
+
+  console.log(
+    "📦 Order number:",
+    populatedOrder?.orderNumber
+  );
+
+  if (!populatedOrder?.user?.email) {
+
+    console.error(
+      "❌ Cannot send email: buyer email not found"
+    );
+
+  } else {
+
+    await sendOrderConfirmationEmail(
+      populatedOrder
+    );
+
+    console.log(
+      "✅ Buyer order confirmation email completed"
+    );
+  }
+
+} catch (emailError) {
+
+  console.error(
+    "❌ Buyer confirmation email failed:"
+  );
+
+  console.error(
+    emailError.message
+  );
+}
+
     /**
      * -----------------------------------------------------
      * SELLER NOTIFICATIONS
@@ -470,17 +518,7 @@ exports.placeOrder = async (req, res) => {
         );
       }
     }
-    // Fire email after response — do not block order placement
-    Order.findById(order._id)
-      .populate("user", "name email")
-      .populate("items.product", "name")
-      .then((populatedOrder) => {
-        if (populatedOrder?.user?.email) {
-          return sendOrderConfirmationEmail(populatedOrder);
-        }
-        console.error("❌ Customer email not found for order", order.orderNumber);
-      })
-      .catch((err) => console.error("❌ Order email failed:", err.message));
+   
     /**
      * -----------------------------------------------------
      * RESPONSE
