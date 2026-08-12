@@ -440,8 +440,8 @@ exports.placeOrder = async (req, res) => {
      * -----------------------------------------------------
      */
 
-    if (sellerIds.length > 0) {
-      const notifications = sellerIds.map(
+    if (sellerIds.size > 0) {
+      const notifications = [...sellerIds].map(
         (sellerId) => ({
           seller: sellerId,
 
@@ -472,7 +472,7 @@ exports.placeOrder = async (req, res) => {
     }
 
     // Send confirmation email
-    if (sellerIds.length > 0) {
+    if (sellerIds.size > 0) {
       try {
         await sendOrderConfirmationEmail(
           await Order.findById(order._id)
