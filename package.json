@@ -28,6 +28,7 @@
     "multer": "^2.2.0",
     "mysql2": "^3.22.6",
     "nodemailer": "^9.0.5",
-    "razorpay": "^2.9.8"
+    "razorpay": "^2.9.8",
+    "resend": "^6.19.0"
   }
 }

@@ -1,144 +1,161 @@
-const nodemailer = require("nodemailer");
-const {
-  EMAIL_USER,
-  EMAIL_PASS,
-} = require("./config");
+const { Resend } = require("resend");
 
-// =====================================================
-// Gmail SMTP Transporter
-// =====================================================
+// ============================================
+// RESEND CONFIGURATION
+// ============================================
 
-const getTransporter = () => {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    throw new Error(
-      "EMAIL_USER and EMAIL_PASS must be configured in .env"
-    );
-  }
+const resendApiKey = process.env.RESEND_API_KEY;
 
-  return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    family: 4, // ⭐ Force IPv4
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
-};
+if (!resendApiKey) {
+  console.error("❌ RESEND_API_KEY is not configured");
+}
 
-// =====================================================
-// Order Confirmation Email
-// =====================================================
+const resend = new Resend(resendApiKey);
+
+// ============================================
+// SEND ORDER CONFIRMATION EMAIL
+// ============================================
 
 const sendOrderConfirmationEmail = async (order) => {
   try {
+    // ------------------------------------------
+    // Validate order
+    // ------------------------------------------
+
     if (!order) {
       throw new Error("Order data is missing");
     }
 
-    const email = order.user?.email;
+    const recipient = order.user?.email;
 
-    if (!email) {
-      throw new Error("Recipient email is missing");
+    if (!recipient) {
+      throw new Error("Customer email is missing");
     }
 
-    if (!Array.isArray(order.items)) {
-      throw new Error("Order items are missing");
+    if (!resendApiKey) {
+      throw new Error("RESEND_API_KEY is not configured");
     }
 
-    console.log("📧 Sending order email to:", email);
-    console.log("📦 Order:", order.orderNumber);
+    const orderNumber =
+      order.orderNumber ||
+      order.orderNo ||
+      order._id?.toString() ||
+      "N/A";
 
-    const itemsHtml = order.items
+    console.log("📧 Sending order email to:", recipient);
+    console.log("📦 Order:", orderNumber);
+
+    // ------------------------------------------
+    // Order values
+    // ------------------------------------------
+
+    const items = Array.isArray(order.items) ? order.items : [];
+
+    const subtotal = Number(order.subtotal || 0);
+    const discount = Number(order.discount || 0);
+    const shippingCost = Number(order.shippingCost || 0);
+    const tax = Number(order.tax || 0);
+    const total = Number(
+      order.total ||
+      subtotal - discount + shippingCost + tax
+    );
+
+    // ------------------------------------------
+    // Shipping address
+    // ------------------------------------------
+
+    const address = order.shippingAddress || {};
+
+    const shippingAddress = `
+      ${address.line1 || ""}
+      ${address.line2 ? `<br>${address.line2}` : ""}
+      <br>
+      ${address.city || ""}
+      ${address.state || ""}
+      - ${address.postalCode || ""}
+      <br>
+      ${address.country || ""}
+    `;
+
+    // ------------------------------------------
+    // Product rows
+    // ------------------------------------------
+
+    const productRows = items
       .map((item) => {
         const productName =
-          item.productName ||
           item.product?.name ||
+          item.productName ||
           "Product";
 
-        const quantity = Number(item.quantity || 0);
-
+        const quantity = Number(item.quantity || 1);
         const price = Number(item.price || 0);
-
-        const total = Number(
-          item.total || price * quantity
-        );
+        const itemTotal = price * quantity;
 
         return `
           <tr>
             <td style="
               padding:12px;
-              border-bottom:1px solid #ddd;
+              border-bottom:1px solid #eee;
+              color:#333;
             ">
               ${productName}
             </td>
 
             <td style="
               padding:12px;
-              border-bottom:1px solid #ddd;
+              border-bottom:1px solid #eee;
               text-align:center;
+              color:#333;
             ">
               ${quantity}
             </td>
 
             <td style="
               padding:12px;
-              border-bottom:1px solid #ddd;
+              border-bottom:1px solid #eee;
               text-align:right;
+              color:#333;
             ">
-              ₹${total.toFixed(2)}
+              ₹${price.toFixed(2)}
+            </td>
+
+            <td style="
+              padding:12px;
+              border-bottom:1px solid #eee;
+              text-align:right;
+              color:#333;
+              font-weight:600;
+            ">
+              ₹${itemTotal.toFixed(2)}
             </td>
           </tr>
         `;
       })
       .join("");
 
-    const shippingAddress =
-      order.shippingAddress || {};
+    // ------------------------------------------
+    // Payment method
+    // ------------------------------------------
+
+    const paymentMethod = order.paymentMethod || "N/A";
+
+    // ------------------------------------------
+    // Customer name
+    // ------------------------------------------
 
     const customerName =
-      shippingAddress.name ||
       order.user?.name ||
+      order.user?.username ||
       "Customer";
 
-    const line1 =
-      shippingAddress.line1 || "";
+    // ------------------------------------------
+    // Email HTML
+    // ------------------------------------------
 
-    const line2 =
-      shippingAddress.line2 || "";
-
-    const city =
-      shippingAddress.city || "";
-
-    const state =
-      shippingAddress.state || "";
-
-    const postalCode =
-      shippingAddress.postalCode ||
-      shippingAddress.pincode ||
-      "";
-
-    const country =
-      shippingAddress.country || "";
-
-    const mailOptions = {
-      from: `"Your Store" <${EMAIL_USER}>`,
-
-      to: email,
-
-      subject: `Order Confirmed - ${
-        order.orderNumber || "Your Order"
-      }`,
-
-      html: `
+    const html = `
 <!DOCTYPE html>
-
-<html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
@@ -151,438 +168,424 @@ const sendOrderConfirmationEmail = async (order) => {
   <title>Order Confirmation</title>
 </head>
 
-<body
-  style="
-    margin:0;
-    padding:20px;
-    background:#f3f4f6;
-    font-family:Arial,Helvetica,sans-serif;
-  "
->
+<body style="
+  margin:0;
+  padding:0;
+  background:#f5f5f5;
+  font-family:Arial,Helvetica,sans-serif;
+">
 
-  <div
-    style="
-      max-width:650px;
+  <div style="
+    width:100%;
+    padding:30px 0;
+  ">
+
+    <div style="
+      max-width:700px;
       margin:0 auto;
       background:#ffffff;
       border-radius:10px;
       overflow:hidden;
-    "
-  >
+      box-shadow:0 2px 10px rgba(0,0,0,0.08);
+    ">
 
-    <!-- HEADER -->
+      <!-- HEADER -->
 
-    <div
-      style="
-        background:#16a34a;
+      <div style="
+        background:#111827;
         padding:25px;
         text-align:center;
-      "
-    >
+      ">
 
-      <h1
-        style="
+        <h1 style="
           margin:0;
           color:#ffffff;
           font-size:26px;
-        "
-      >
-        Order Confirmed 🎉
-      </h1>
+        ">
+          Order Confirmed
+        </h1>
 
-    </div>
-
-
-    <!-- CONTENT -->
-
-    <div style="padding:25px;">
-
-      <p style="font-size:16px;">
-        Hello ${customerName},
-      </p>
-
-      <p
-        style="
-          color:#374151;
-          line-height:1.6;
-        "
-      >
-        Thank you for your order.
-        Your order has been successfully placed.
-      </p>
-
-
-      <!-- ORDER SUMMARY -->
-
-      <div
-        style="
-          background:#f9fafb;
-          border:1px solid #e5e7eb;
-          border-radius:8px;
-          padding:18px;
-          margin:20px 0;
-        "
-      >
-
-        <p style="margin:0 0 8px;">
-          <strong>Order Number:</strong>
-          ${order.orderNumber || "-"}
-        </p>
-
-        <p style="margin:0;">
-          <strong>Total Amount:</strong>
-          ₹${Number(order.total || 0).toFixed(2)}
+        <p style="
+          margin:8px 0 0;
+          color:#d1d5db;
+          font-size:14px;
+        ">
+          Thank you for your purchase!
         </p>
 
       </div>
 
+      <!-- CONTENT -->
 
-      <!-- ORDER ITEMS -->
+      <div style="
+        padding:30px;
+      ">
 
-      <h3>Order Details</h3>
+        <h2 style="
+          margin-top:0;
+          color:#111827;
+        ">
+          Hi ${customerName},
+        </h2>
 
-      <table
-        width="100%"
-        cellspacing="0"
-        cellpadding="0"
-        style="
-          border-collapse:collapse;
-          font-size:14px;
-        "
-      >
+        <p style="
+          color:#555;
+          font-size:15px;
+          line-height:1.6;
+        ">
+          Your order has been successfully placed.
+          We have received your order and will process it shortly.
+        </p>
 
-        <thead>
+        <!-- ORDER NUMBER -->
 
-          <tr
-            style="
-              background:#f3f4f6;
-            "
-          >
+        <div style="
+          margin:25px 0;
+          padding:18px;
+          background:#f3f4f6;
+          border-radius:8px;
+        ">
 
-            <th
-              style="
+          <p style="
+            margin:0 0 5px;
+            color:#6b7280;
+            font-size:13px;
+          ">
+            Order Number
+          </p>
+
+          <strong style="
+            color:#111827;
+            font-size:18px;
+          ">
+            ${orderNumber}
+          </strong>
+
+        </div>
+
+        <!-- ITEMS -->
+
+        <h3 style="
+          color:#111827;
+          margin-bottom:12px;
+        ">
+          Order Details
+        </h3>
+
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          style="
+            border-collapse:collapse;
+            font-size:14px;
+          "
+        >
+
+          <thead>
+
+            <tr style="
+              background:#f9fafb;
+            ">
+
+              <th style="
                 padding:12px;
                 text-align:left;
-              "
-            >
-              Product
-            </th>
+                color:#374151;
+              ">
+                Product
+              </th>
 
-            <th
-              style="
+              <th style="
                 padding:12px;
                 text-align:center;
-              "
-            >
-              Qty
-            </th>
+                color:#374151;
+              ">
+                Qty
+              </th>
 
-            <th
-              style="
+              <th style="
                 padding:12px;
                 text-align:right;
-              "
-            >
-              Amount
-            </th>
+                color:#374151;
+              ">
+                Price
+              </th>
 
-          </tr>
+              <th style="
+                padding:12px;
+                text-align:right;
+                color:#374151;
+              ">
+                Total
+              </th>
 
-        </thead>
+            </tr>
 
-        <tbody>
+          </thead>
 
-          ${itemsHtml}
+          <tbody>
 
-        </tbody>
+            ${productRows}
 
-      </table>
+          </tbody>
 
+        </table>
 
-      <!-- SHIPPING ADDRESS -->
+        <!-- SUMMARY -->
 
-      <h3 style="margin-top:30px;">
-        Shipping Address
-      </h3>
+        <div style="
+          margin-top:25px;
+          border-top:1px solid #eee;
+          padding-top:15px;
+        ">
 
-      <div
-        style="
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+          >
+
+            <tr>
+
+              <td style="
+                padding:6px 0;
+                color:#555;
+              ">
+                Subtotal
+              </td>
+
+              <td style="
+                padding:6px 0;
+                text-align:right;
+              ">
+                ₹${subtotal.toFixed(2)}
+              </td>
+
+            </tr>
+
+            <tr>
+
+              <td style="
+                padding:6px 0;
+                color:#555;
+              ">
+                Discount
+              </td>
+
+              <td style="
+                padding:6px 0;
+                text-align:right;
+              ">
+                - ₹${discount.toFixed(2)}
+              </td>
+
+            </tr>
+
+            <tr>
+
+              <td style="
+                padding:6px 0;
+                color:#555;
+              ">
+                Shipping
+              </td>
+
+              <td style="
+                padding:6px 0;
+                text-align:right;
+              ">
+                ₹${shippingCost.toFixed(2)}
+              </td>
+
+            </tr>
+
+            <tr>
+
+              <td style="
+                padding:6px 0;
+                color:#555;
+              ">
+                Tax
+              </td>
+
+              <td style="
+                padding:6px 0;
+                text-align:right;
+              ">
+                ₹${tax.toFixed(2)}
+              </td>
+
+            </tr>
+
+            <tr>
+
+              <td style="
+                padding-top:15px;
+                border-top:1px solid #ddd;
+                font-size:18px;
+                font-weight:bold;
+                color:#111827;
+              ">
+                Total
+              </td>
+
+              <td style="
+                padding-top:15px;
+                border-top:1px solid #ddd;
+                text-align:right;
+                font-size:18px;
+                font-weight:bold;
+                color:#111827;
+              ">
+                ₹${total.toFixed(2)}
+              </td>
+
+            </tr>
+
+          </table>
+
+        </div>
+
+        <!-- PAYMENT -->
+
+        <div style="
+          margin-top:25px;
+          padding:18px;
           background:#f9fafb;
-          border:1px solid #e5e7eb;
           border-radius:8px;
-          padding:15px;
+        ">
+
+          <p style="
+            margin:0;
+            color:#555;
+          ">
+            <strong>Payment Method:</strong>
+            ${paymentMethod}
+          </p>
+
+        </div>
+
+        <!-- SHIPPING -->
+
+        <div style="
+          margin-top:25px;
+        ">
+
+          <h3 style="
+            color:#111827;
+            margin-bottom:8px;
+          ">
+            Shipping Address
+          </h3>
+
+          <p style="
+            margin:0;
+            color:#555;
+            line-height:1.6;
+          ">
+            ${shippingAddress}
+          </p>
+
+        </div>
+
+        <!-- FOOTER MESSAGE -->
+
+        <p style="
+          margin-top:30px;
+          color:#555;
           line-height:1.6;
-          color:#374151;
-        "
-      >
-
-        <strong>${customerName}</strong>
-
-        ${
-          line1
-            ? `<br>${line1}`
-            : ""
-        }
-
-        ${
-          line2
-            ? `<br>${line2}`
-            : ""
-        }
-
-        ${
-          city
-            ? `<br>${city}`
-            : ""
-        }
-
-        ${
-          state
-            ? `, ${state}`
-            : ""
-        }
-
-        ${
-          postalCode
-            ? `<br>${postalCode}`
-            : ""
-        }
-
-        ${
-          country
-            ? `<br>${country}`
-            : ""
-        }
+        ">
+          Thank you for shopping with us.
+          We will notify you when your order is shipped.
+        </p>
 
       </div>
 
+      <!-- FOOTER -->
 
-      <p
-        style="
-          margin-top:25px;
-          color:#374151;
-          line-height:1.6;
-        "
-      >
-        We will notify you when your order is shipped.
-      </p>
-
-      <p
-        style="
-          color:#374151;
-        "
-      >
-        Thank you for shopping with us!
-      </p>
-
-    </div>
-
-
-    <!-- FOOTER -->
-
-    <div
-      style="
+      <div style="
         background:#f9fafb;
-        padding:15px;
+        padding:20px;
         text-align:center;
-      "
-    >
+        color:#888;
+        font-size:12px;
+      ">
 
-      <p
-        style="
-          margin:0;
-          font-size:12px;
-          color:#777;
-        "
-      >
-        This is an automated email.
-        Please do not reply to this email.
-      </p>
+        <p style="margin:0;">
+          This is an automated order confirmation email.
+        </p>
+
+      </div>
 
     </div>
 
   </div>
 
 </body>
-
 </html>
-      `,
-    };
+`;
 
-    const transporter = getTransporter();
+    // ============================================
+    // SEND THROUGH RESEND API
+    // ============================================
 
-    const info =
-      await transporter.sendMail(mailOptions);
+    /*
+      IMPORTANT:
 
-    console.log("✅ Order confirmation email sent");
-    console.log("📧 To:", email);
-    console.log("📦 Order:", order.orderNumber);
-    console.log("🆔 Message ID:", info.messageId);
+      For initial testing, Resend provides
+      onboarding@resend.dev.
 
-    return info;
+      For production, verify your own domain
+      in Resend and replace this address.
+    */
 
-  } catch (error) {
+    const fromEmail =
+      process.env.RESEND_FROM_EMAIL ||
+      "onboarding@resend.dev";
 
-    console.error(
-      "❌ Order confirmation email failed:"
-    );
+    console.log("📨 Sending through Resend...");
+    console.log("From:", fromEmail);
+    console.log("To:", recipient);
 
-    console.error("Message:", error.message);
-    console.error("Code:", error.code);
-    console.error("Response:", error.response);
+    const { data, error } = await resend.emails.send({
+      from: fromEmail,
+      to: [recipient],
+      subject: `Order Confirmation - ${orderNumber}`,
+      html,
+    });
 
-    throw error;
-  }
-};
+    // ============================================
+    // HANDLE RESEND ERROR
+    // ============================================
 
+    if (error) {
+      console.error("❌ Resend API error:");
+      console.error(error);
 
-// =====================================================
-// Shipment Update Email
-// =====================================================
-
-const sendShipmentUpdateEmail = async ({
-  email,
-  name,
-  orderNumber,
-  status,
-  trackingNumber,
-  carrier,
-}) => {
-
-  try {
-
-    if (!email) {
       throw new Error(
-        "Recipient email is missing"
+        error.message || "Resend email sending failed"
       );
     }
 
-    const transporter =
-      getTransporter();
+    // ============================================
+    // SUCCESS
+    // ============================================
 
-    const mailOptions = {
+    console.log("✅ ORDER EMAIL SENT");
+    console.log("📨 Resend Email ID:", data?.id);
 
-      from:
-        `"Your Store" <${EMAIL_USER}>`,
-
-      to: email,
-
-      subject:
-        `Shipment Update - Order ${orderNumber}`,
-
-      html: `
-<!DOCTYPE html>
-
-<html>
-
-<head>
-  <meta charset="UTF-8">
-</head>
-
-<body
-  style="
-    margin:0;
-    padding:20px;
-    background:#f3f4f6;
-    font-family:Arial,Helvetica,sans-serif;
-  "
->
-
-  <div
-    style="
-      max-width:650px;
-      margin:auto;
-      background:#ffffff;
-      padding:25px;
-      border-radius:10px;
-    "
-  >
-
-    <h2 style="color:#2563eb;">
-      Shipment Update 📦
-    </h2>
-
-    <p>
-      Hello ${name || "Customer"},
-    </p>
-
-    <p>
-      Your order
-      <strong>${orderNumber || "-"}</strong>
-      has been updated.
-    </p>
-
-    <div
-      style="
-        background:#f3f4f6;
-        padding:18px;
-        border-radius:8px;
-        line-height:1.8;
-      "
-    >
-
-      <strong>Status:</strong>
-      ${status || "-"}
-      <br>
-
-      ${
-        carrier
-          ? `
-            <strong>Carrier:</strong>
-            ${carrier}
-            <br>
-          `
-          : ""
-      }
-
-      ${
-        trackingNumber
-          ? `
-            <strong>Tracking Number:</strong>
-            ${trackingNumber}
-          `
-          : ""
-      }
-
-    </div>
-
-    <p>
-      Thank you for shopping with us!
-    </p>
-
-  </div>
-
-</body>
-
-</html>
-      `,
-    };
-
-    const info =
-      await transporter.sendMail(
-        mailOptions
-      );
-
-    console.log(
-      "✅ Shipment update email sent:",
-      info.messageId
-    );
-
-    return info;
+    return data;
 
   } catch (error) {
-
-    console.error(
-      "❌ Shipment update email failed:",
-      error.message
-    );
+    console.error("❌ Order confirmation email failed:");
+    console.error("Message:", error.message);
+    console.error("Code:", error.code || "N/A");
 
     throw error;
   }
 };
 
-
 module.exports = {
   sendOrderConfirmationEmail,
-  sendShipmentUpdateEmail,
 };
