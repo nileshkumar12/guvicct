@@ -18,25 +18,24 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const cors = require("cors");
 const path = require("path");
 const app = express();
-
+debugger;
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.FRONTEND_URL,
+  "https://ecommerce-nilesh.netlify.app",
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
       }
-
-      callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
   })
 );
-
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
