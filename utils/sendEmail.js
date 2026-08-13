@@ -542,11 +542,7 @@ const sendOrderConfirmationEmail = async (order) => {
 
     const fromEmail =
       process.env.RESEND_FROM_EMAIL ||
-      "onboarding@resend.dev";
-
-    console.log("📨 Sending through Resend...");
-    console.log("From:", fromEmail);
-    console.log("To:", recipient);
+      "orders@nileshdesigner.co.in";
 
     const { data, error } = await resend.emails.send({
       from: fromEmail,
@@ -571,9 +567,6 @@ const sendOrderConfirmationEmail = async (order) => {
     // ============================================
     // SUCCESS
     // ============================================
-
-    console.log("✅ ORDER EMAIL SENT");
-    console.log("📨 Resend Email ID:", data?.id);
 
     return data;
 
