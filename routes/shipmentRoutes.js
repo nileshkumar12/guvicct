@@ -1,6 +1,6 @@
 const express = require('express');
 const router  = express.Router();
-const { protect, sellerOnly } = require('../middleware/auth'); // adjust path/name
+const { protect, sellerOnly } = require('../middleware/auth'); 
 const {
   createShipment,
   getSellerShipments,
