@@ -40,7 +40,7 @@ const createRazorpayOrder = async (req, res) => {
             });
         }
 
-        const amountInPaise = Math.round(Number(order.total));
+        const amountInPaise = Math.round(Number(order.total) * 100);
         if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
             return res.status(400).json({
                 success: false,
