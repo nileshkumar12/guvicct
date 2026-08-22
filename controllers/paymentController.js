@@ -1,5 +1,5 @@
 const crypto = require('crypto')
-const Razorpay = require('razorpay')
+const  Razorpay= require('razorpay')
 
 
 const razorpay =

@@ -125,14 +125,19 @@ exports.placeOrder = async (req, res) => {
                 message: "Authentication required",
             });
         }
-        const {
-            items,
-            shippingAddress,
-            paymentMethod,
-            shippingCost = 0,
-            tax = 0,
-            discount = 0,
-        } = req.body || {};
+       const {
+    items,
+    shippingAddress,
+    paymentMethod,
+    shippingCost = 0,
+    tax = 0,
+    discount = 0,
+    razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature,
+} = req.body || {};
+
+
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -146,15 +151,24 @@ exports.placeOrder = async (req, res) => {
                 message: "Complete shipping address is required",
             });
         }
-        const resolvedPaymentMethod = String(paymentMethod || "cod").trim().toLowerCase();
-        if (!PAYMENT_METHODS.includes(resolvedPaymentMethod)) {
-            return res.status(400).json({
-                success: false,
-                message: `paymentMethod must be one of: ${PAYMENT_METHODS.join(
-            ", "
-          )}`,
-            });
-        }
+
+		const resolvedPaymentMethod = String(paymentMethod || "cod").trim().toLowerCase();
+
+		if (!PAYMENT_METHODS.includes(resolvedPaymentMethod)) {
+			return res.status(400).json({
+				success: false,
+				message: `paymentMethod must be one of: ${PAYMENT_METHODS.join(", ")}`
+			});
+		}
+		if (resolvedPaymentMethod === "razorpay") {
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        return res.status(400).json({
+            success: false,
+            message:
+                "Razorpay order ID, payment ID and signature are required",
+        });
+    }
+}
         const {
             orderItems,
             subtotal,
@@ -169,7 +183,7 @@ exports.placeOrder = async (req, res) => {
         const positiveTax = Math.max(0, safeTax);
         const safeDiscount = Math.min(positiveDiscount, safeSubtotal);
         const total = safeSubtotal - safeDiscount + positiveShippingCost + positiveTax;
-        const order = await Order.create({
+       /* const order = await Order.create({
             user: userId,
             items: orderItems,
             shippingAddress: normalizedShippingAddress,
@@ -179,7 +193,32 @@ exports.placeOrder = async (req, res) => {
             shippingCost: positiveShippingCost,
             tax: positiveTax,
             total,
-        });
+        });*/
+		const isRazorpay = resolvedPaymentMethod === "razorpay";
+
+const order = await Order.create({
+    user: userId,
+    items: orderItems,
+    shippingAddress: normalizedShippingAddress,
+    paymentMethod: resolvedPaymentMethod,
+    paymentStatus: isRazorpay ? "Paid" : "Pending",
+    razorpayOrderId: isRazorpay
+        ? String(razorpayOrderId)
+        : null,
+    razorpayPaymentId: isRazorpay
+        ? String(razorpayPaymentId)
+        : null,
+    razorpaySignature: isRazorpay
+        ? String(razorpaySignature)
+        : null,
+    subtotal: safeSubtotal,
+    discount: safeDiscount,
+    shippingCost: positiveShippingCost,
+    tax: positiveTax,
+    total,
+    status: isRazorpay ? "Confirmed" : "Pending",
+});
+		
         const populatedOrder = await Order.findById(order._id).populate("user", "name email").populate("items.product", "name price image");
         console.log("Order created:", order.orderNumber);
         if (sellerIds.length > 0) {
