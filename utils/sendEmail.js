@@ -105,17 +105,13 @@ if (!resendApiKey) {
           </div>
           <div style="margin-top:25px; padding:18px; background:#f9fafb;border-radius:8px;">
             <p style="margin:0;color:#555;">
-              <strong>Payment Method:</strong> ${paymentType}
+              <strong>Payment Type:</strong> ${paymentType}
             </p>
           </div>
-          <div style=" margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px; ">
-            <p style=" margin:0; color:#555; ">
-              <strong>Payment Method:</strong> ${paymentprovider}
-            </p>
-          </div>
+
           <div style="margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px; ">
             <p style="margin:0; color:#555;">
-              <strong>Payment Method:</strong> ${paymentprovider}
+              <strong>Payment Provider:</strong> ${paymentProvider}
             </p>
           </div>
           <div style="margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px;">
