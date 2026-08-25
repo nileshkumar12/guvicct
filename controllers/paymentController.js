@@ -74,6 +74,40 @@ const verifyRazorpayPayment =
 					})
 			}
 
+			const payment = await razorpay.payments.fetch(
+				razorpay_payment_id,
+				{
+					expand: ["card"],
+				}
+			);
+
+			if (!payment || payment.status !== "captured") {
+				return res.status(400).json({
+					success: false,
+					verified: false,
+					message: `Razorpay payment is not in a valid state: ${payment?.status || "unknown"}`,
+				});
+			}
+
+			console.log("Razorpay payment details:", payment);
+
+			const razorpayMethod = payment?.method || null;
+
+			const paymentTypeMap = {
+				card: "Card",
+				upi: "UPI",
+				netbanking: "Net Banking",
+				wallet: "Wallet",
+				emi: "EMI",
+				paylater: "Pay Later",
+			};
+
+			const paymentType = paymentTypeMap[razorpayMethod] || razorpayMethod || "Unknown";
+			const cardNetwork = razorpayMethod === "card"  ? payment?.card?.network || null : null;
+			const cardType = razorpayMethod === "card" ? payment?.card?.type || null : null;
+			const cardLast4 = razorpayMethod === "card"  ? payment?.card?.last4 || null : null;
+			const cardIssuer = razorpayMethod === "card" ? payment?.card?.issuer || null : null;
+			const bankName = razorpayMethod === "netbanking" ? payment?.bank || null : null;
 			return res.json({
 				success: true,
 				verified: true,
@@ -83,7 +117,15 @@ const verifyRazorpayPayment =
 				razorpay_order_id,
 				razorpay_payment_id,
 				razorpay_signature,
-			})
+				paymentProvider: "Razorpay",
+				paymentType,
+				razorpayMethod,
+				cardNetwork,
+				cardType,
+				cardLast4,
+				cardIssuer,
+				bankName,
+			});
 
 		} catch (error) {
 			console.error( 'Razorpay verification error:', error )

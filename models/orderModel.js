@@ -48,6 +48,7 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    
   },
   { _id: false }
 );
@@ -145,6 +146,46 @@ const orderSchema = new mongoose.Schema(
     },
 
     razorpaySignature: {
+      type: String,
+      default: null,
+    },
+
+    paymentType: {
+      type: String,
+      default: null,
+    },
+
+    paymentProvider: {
+      type: String,
+      default: null,
+    },
+
+    razorpayMethod: {
+      type: String,
+      default: null,
+    },
+
+    cardNetwork: {
+      type: String,
+      default: null,
+    },
+
+    cardType: {
+      type: String,
+      default: null,
+    },
+
+    cardLast4: {
+      type: String,
+      default: null,
+    },
+
+    cardIssuer: {
+      type: String,
+      default: null,
+    },
+
+    bankName: {
       type: String,
       default: null,
     },

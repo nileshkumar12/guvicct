@@ -129,6 +129,14 @@ exports.placeOrder = async (req, res) => {
             items,
             shippingAddress,
             paymentMethod,
+            paymentType,
+            paymentProvider,
+            razorpayMethod,
+            cardNetwork,
+            cardType,
+            cardLast4,
+            cardIssuer,
+            bankName,
             shippingCost = 0,
             tax = 0,
             discount = 0,
@@ -193,26 +201,50 @@ exports.placeOrder = async (req, res) => {
         const isRazorpay = resolvedPaymentMethod === "razorpay";
 
         const order = await Order.create({
-            user: userId,
-            items: orderItems,
-            shippingAddress: normalizedShippingAddress,
-            paymentMethod: resolvedPaymentMethod,
-            paymentStatus: isRazorpay ? "Paid" : "Pending",
-            razorpayOrderId: isRazorpay
-                ? String(razorpayOrderId)
-                : null,
-            razorpayPaymentId: isRazorpay
-                ? String(razorpayPaymentId)
-                : null,
-            razorpaySignature: isRazorpay
-                ? String(razorpaySignature)
-                : null,
-            subtotal: safeSubtotal,
-            discount: safeDiscount,
-            shippingCost: positiveShippingCost,
-            tax: positiveTax,
-            total,
-            status: isRazorpay ? "Confirmed" : "Pending",
+                    user: userId,
+                    items: orderItems,
+                    shippingAddress: normalizedShippingAddress,
+                    paymentMethod: resolvedPaymentMethod,
+                    paymentType: isRazorpay
+                        ? String(paymentType || "Unknown")
+                        : "Cash on Delivery",
+                    paymentProvider: isRazorpay
+                        ? String(paymentProvider || "Razorpay")
+                        : null,
+                    razorpayMethod: isRazorpay
+                        ? String(razorpayMethod || "")
+                        : null,
+                    cardNetwork: isRazorpay
+                        ? String(cardNetwork || "")
+                        : null,
+                    cardType: isRazorpay
+                        ? String(cardType || "")
+                        : null,
+                    cardLast4: isRazorpay
+                        ? String(cardLast4 || "")
+                        : null,
+                    cardIssuer: isRazorpay
+                        ? String(cardIssuer || "")
+                        : null,
+                    bankName: isRazorpay
+                        ? String(bankName || "")
+                        : null,
+                    paymentStatus: isRazorpay ? "Paid" : "Pending",
+                    razorpayOrderId: isRazorpay
+                        ? String(razorpayOrderId)
+                        : null,
+                    razorpayPaymentId: isRazorpay
+                        ? String(razorpayPaymentId)
+                        : null,
+                    razorpaySignature: isRazorpay
+                        ? String(razorpaySignature)
+                        : null,
+                    subtotal: safeSubtotal,
+                    discount: safeDiscount,
+                    shippingCost: positiveShippingCost,
+                    tax: positiveTax,
+                    total,
+                    status: isRazorpay ? "Confirmed" : "Pending",
         });
 
         const populatedOrder = await Order.findById(order._id).populate("user", "name email").populate("items.product", "name price image");

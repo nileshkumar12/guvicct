@@ -35,6 +35,12 @@ if (!resendApiKey) {
            const paymentMethod = order.paymentMethod || "N/A"; 
            const paymentType = order.paymentType || "N/A";
             const paymentProvider = order.paymentProvider || "N/A"; 
+            const razorpayMethod = order.razorpayMethod || "";
+            const cardNetwork = order.cardNetwork || "";
+            const cardType = order.cardType || "";
+            const cardLast4 = order.cardLast4 || "";
+            const cardIssuer = order.cardIssuer || "";
+            const bankName = order.bankName || "";
             const paymentStatus = order.paymentStatus || "N/A"; 
             const transactionId = order.razorpayPaymentId || "N/A"; 
             const customerName = order.user?.name || order.user?.username || "Customer";
@@ -99,31 +105,43 @@ if (!resendApiKey) {
             </table>
           </div>
          <div style="margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px;">
-            <p style="margin:0;color:#555; ">
-              <strong>Payment Method:</strong> ${paymentMethod}
-            </p>
-          </div>
-          <div style="margin-top:25px; padding:18px; background:#f9fafb;border-radius:8px;">
             <p style="margin:0;color:#555;">
-              <strong>Payment Type:</strong> ${paymentType}
+                <strong>Payment Method:</strong> ${paymentMethod}
             </p>
-          </div>
+            <p style="margin:8px 0 0;color:#555;">
+                <strong>Payment Type:</strong> ${paymentType}
+            </p>
+            <p style="margin:8px 0 0;color:#555;">
+                <strong>Payment Provider:</strong> ${paymentProvider}
+            </p>
+            ${paymentType === "Card" ? `
+                <p style="margin:8px 0 0;color:#555;">
+                    <strong>Card Network:</strong> ${cardNetwork || "N/A"}
+                </p>
+                <p style="margin:8px 0 0;color:#555;">
+                    <strong>Card Type:</strong> ${cardType || "N/A"}
+                </p>
+                <p style="margin:8px 0 0;color:#555;">
+                    <strong>Card:</strong> **** ${cardLast4 || "N/A"}
+                </p>
+                <p style="margin:8px 0 0;color:#555;">
+                    <strong>Card Issuer:</strong> ${cardIssuer || "N/A"}
+                </p>
+            ` : ""}
+            ${paymentType === "Net Banking" ? `
+                <p style="margin:8px 0 0;color:#555;">
+                    <strong>Bank:</strong> ${bankName || "N/A"}
+                </p>
+            ` : ""}
+            <p style="margin:8px 0 0;color:#555;">
+                <strong>Payment Status:</strong> ${paymentStatus}
+            </p>
 
-          <div style="margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px; ">
-            <p style="margin:0; color:#555;">
-              <strong>Payment Provider:</strong> ${paymentProvider}
+            <p style="margin:8px 0 0;color:#555;">
+                <strong>Transaction ID:</strong> ${transactionId}
             </p>
           </div>
-          <div style="margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px;">
-            <p style=" margin:0; color:#555;">
-              <strong>Payment Status:</strong> ${paymentStatus}
-            </p>
-          </div>
-          <div style=" margin-top:25px; padding:18px; background:#f9fafb; border-radius:8px;">
-            <p style="  margin:0;color:#555;">
-              <strong>Trasaction ID:</strong> ${transactionId}
-            </p>
-          </div>
+          
           <div style=" margin-top:25px;">
             <h3 style=" color:#111827; margin-bottom:8px;"> Shipping Address </h3>
             <p style="margin:0; color:#555; line-height:1.6;"> ${shippingAddress} </p>
