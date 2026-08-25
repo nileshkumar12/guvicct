@@ -74,18 +74,21 @@ const verifyRazorpayPayment =
 					})
 			}
 
-			const payment = await razorpay.payments.fetch(
-				razorpay_payment_id,
-				{
-					expand: ["card"],
-				}
-			);
+			let payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+			if (payment.status === "authorized") {
+				payment = await razorpay.payments.capture(
+					razorpay_payment_id,
+					payment.amount,
+					payment.currency
+				);
+			}
 
 			if (!payment || payment.status !== "captured") {
 				return res.status(400).json({
 					success: false,
 					verified: false,
-					message: `Razorpay payment is not in a valid state: ${payment?.status || "unknown"}`,
+					message: `Razorpay payment was not captured: ${payment?.status || "unknown"}`,
 				});
 			}
 
