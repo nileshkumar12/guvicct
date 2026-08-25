@@ -82,7 +82,7 @@ const verifyRazorpayPayment =
 				razorpaySignature: razorpay_signature,
 				razorpay_order_id,
 				razorpay_payment_id,
-				razssorpay_signature,
+				razorpay_signature,
 			})
 
 		} catch (error) {
