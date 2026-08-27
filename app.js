@@ -15,11 +15,10 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
 const storeRoutes = require("./routes/storeRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
-
+const conntactEmailRoutes = require("./routes/sendcontactemailRouter");
 const cors = require("cors");
 const path = require("path");
 const app = express();
-debugger;
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ecommerce-nilesh.netlify.app",
@@ -60,4 +59,6 @@ app.use('/api/seller/notifications', notificationRoutes);
 app.use('/api/shipments', shipmentRoutes); 
 app.use("/api/stores", storeRoutes);
 app.use("/api", reviewRoutes);
+app.use("/api/email/contactemail", conntactEmailRoutes);
+
 module.exports =app;
