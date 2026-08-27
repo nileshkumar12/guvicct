@@ -46,8 +46,8 @@ exports.SendContactEmail = async (req, res) => {
 
 
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL,
-            to: [process.env.CONTACT_RECEIVER],
+            from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
+            to: [process.env.CONTACT_RECEIVER] || "nilesh.kumar12@gmail.com",
             replyTo: email.trim(),
 
             subject: `New Contact Enquiry: ${subject.trim()}`,
