@@ -11,7 +11,7 @@ exports.SendContactEmail = async (req, res) => {
             message,
         } = req.body || {};
 
-   
+
         if (
             !name?.trim() ||
             !email?.trim() ||
@@ -34,7 +34,26 @@ exports.SendContactEmail = async (req, res) => {
                 message: "Please provide a valid email address.",
             });
         }
+        if (!process.env.RESEND_API_KEY) {
+            return res.status(500).json({
+                success: false,
+                message: "RESEND_API_KEY is not configured.",
+            });
+        }
 
+        if (!process.env.CONTACT_RECEIVER) {
+            return res.status(500).json({
+                success: false,
+                message: "CONTACT_RECEIVER is not configured.",
+            });
+        }
+
+        if (!process.env.RESEND_FROM_EMAIL) {
+            return res.status(500).json({
+                success: false,
+                message: "RESEND_FROM_EMAIL is not configured.",
+            });
+        }
 
         const contactEmail = await ContactEmail.create({
             name: name.trim(),
@@ -46,10 +65,9 @@ exports.SendContactEmail = async (req, res) => {
 
 
         const { data, error } = await resend.emails.send({
-            from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
-            to: [process.env.CONTACT_RECEIVER] || "nilesh.kumar12@gmail.com",
+            from: process.env.RESEND_FROM_EMAIL,
+            to: [process.env.CONTACT_RECEIVER],
             replyTo: email.trim(),
-
             subject: `New Contact Enquiry: ${subject.trim()}`,
 
             html: `
@@ -191,12 +209,12 @@ exports.SendContactEmail = async (req, res) => {
         });
 
         if (error) {
-            console.error("Resend Error:", error);
+            console.error("RESEND ERROR:", error);
 
             return res.status(500).json({
                 success: false,
-                message:
-                    "Contact information was saved, but email could not be sent.",
+                message: "Contact information was saved, but email could not be sent.",
+                resendError: error.message || error,
                 contactId: contactEmail._id,
             });
         }
