@@ -2,8 +2,8 @@ const SellerNotification = require('../models/sellerNotificationModel');
 // GET /api/seller/notifications
 exports.getSellerNotifications = async (req, res) => {
   try {
-    const notifications = await SellerNotification.find({ seller: req.user._id }) // ✅ "seller" not "sellerId"
-      .populate('order', 'orderNumber total')                                      // ✅ "order" not "orderId"
+    const notifications = await SellerNotification.find({ seller: req.user._id }) 
+      .populate('order', 'orderNumber total')                                      
       .sort({ createdAt: -1 });
     res.json({ success: true, notifications });
   } catch (err) {

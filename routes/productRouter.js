@@ -23,11 +23,15 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({ storage, fileFilter });
+const productImageUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'images', maxCount: 10 },
+]);
 
 router.get('/', getProducts);
 router.get('/:id', getProductById);
-router.post('/', auth, upload.single('image'), createProduct);
-router.put('/:id', auth, upload.single('image'), updateProduct);
+router.post('/', auth, productImageUpload, createProduct);
+router.put('/:id', auth, productImageUpload, updateProduct);
 router.delete('/:id', auth, deleteProduct);
 
 module.exports = router;

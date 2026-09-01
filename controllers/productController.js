@@ -8,6 +8,189 @@ const {
   uploadBase64,
 } = require("../utils/cloudinary");
 
+const PRODUCT_STATUSES = [
+  "active",
+  "inactive",
+  "outofstock",
+  "draft",
+];
+
+const createValidationError = (message) => {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+};
+
+const validateStatus = (status, field) => {
+  if (!PRODUCT_STATUSES.includes(status)) {
+    throw createValidationError(
+      `${field} must be one of: ${PRODUCT_STATUSES.join(", ")}.`
+    );
+  }
+
+  return status;
+};
+
+const parseImageValues = (rawImages, field) => {
+  if (rawImages === undefined || rawImages === null) {
+    return [];
+  }
+
+  let images = rawImages;
+
+  if (
+    typeof images === "string" &&
+    images.trim().startsWith("[")
+  ) {
+    try {
+      images = JSON.parse(images);
+    } catch (error) {
+      throw createValidationError(
+        `${field} must be a valid JSON array.`
+      );
+    }
+  }
+
+  if (!Array.isArray(images)) {
+    images = [images];
+  }
+
+  if (
+    images.some(
+      (image) =>
+        typeof image !== "string" || !image.trim()
+    )
+  ) {
+    throw createValidationError(
+      `${field} must contain non-empty image URLs or Base64 images.`
+    );
+  }
+
+  return images;
+};
+
+const uploadImageValues = async (images) => {
+  return Promise.all(
+    images.map(async (image) => {
+      if (isBase64Image(image)) {
+        const uploadResult = await uploadBase64(image);
+        return uploadResult.secure_url;
+      }
+
+      return image;
+    })
+  );
+};
+
+const getProductImages = async (req) => {
+  const files = [
+    ...(req.files?.image || []),
+    ...(req.files?.images || []),
+  ];
+  const uploadedImages = await Promise.all(
+    files.map(async (file) => {
+      const uploadResult = await uploadBuffer(
+        file.buffer,
+        file.mimetype
+      );
+      return uploadResult.secure_url;
+    })
+  );
+  const suppliedImages = await uploadImageValues([
+    ...parseImageValues(req.body?.image, "Image"),
+    ...parseImageValues(req.body?.images, "Images"),
+  ]);
+
+  return [...uploadedImages, ...suppliedImages];
+};
+
+const parseVariants = async (rawVariants) => {
+  if (rawVariants === undefined) {
+    return undefined;
+  }
+
+  let variants = rawVariants;
+
+  if (typeof variants === "string") {
+    try {
+      variants = JSON.parse(variants);
+    } catch (error) {
+      throw createValidationError(
+        "Variants must be a valid JSON array."
+      );
+    }
+  }
+
+  if (!Array.isArray(variants)) {
+    throw createValidationError("Variants must be an array.");
+  }
+
+  return Promise.all(variants.map(async (variant, index) => {
+    if (
+      !variant ||
+      typeof variant !== "object" ||
+      Array.isArray(variant)
+    ) {
+      throw createValidationError(
+        `Variant ${index + 1} must be an object.`
+      );
+    }
+
+    const price = Number(variant.price);
+    const stock = Number(variant.stock);
+    const sku = String(variant.sku || "").trim();
+
+    if (
+      !variant.attributes ||
+      typeof variant.attributes !== "object" ||
+      Array.isArray(variant.attributes)
+    ) {
+      throw createValidationError(
+        `Variant ${index + 1} attributes must be an object.`
+      );
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      throw createValidationError(
+        `Variant ${index + 1} price must be a valid non-negative number.`
+      );
+    }
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      throw createValidationError(
+        `Variant ${index + 1} stock must be a valid non-negative integer.`
+      );
+    }
+
+    if (!sku) {
+      throw createValidationError(
+        `Variant ${index + 1} SKU is required.`
+      );
+    }
+
+    const images = await uploadImageValues([
+      ...parseImageValues(variant.image, `Variant ${index + 1} image`),
+      ...parseImageValues(variant.images, `Variant ${index + 1} images`),
+    ]);
+
+    return {
+      attributes: variant.attributes,
+      price,
+      stock,
+      sku,
+      image: images[0] || "",
+      images,
+      status:
+        variant.status === undefined
+          ? "draft"
+          : validateStatus(
+              variant.status,
+              `Variant ${index + 1} status`
+            ),
+    };
+  }));
+};
+
 /**
  * ---------------------------------------------------------
  * REQUIRE SELLER
@@ -35,6 +218,7 @@ const requireSeller = async (userId) => {
 
     error.status = 403;
     throw error;
+
   }
 
   return seller;
@@ -189,10 +373,14 @@ exports.createProduct = async (req, res) => {
       name,
       description,
       category,
+      subcategory,
       brand,
       price,
       rating,
       stock,
+      status,
+      variants,
+      images,
     } = req.body || {};
 
     /**
@@ -201,6 +389,7 @@ exports.createProduct = async (req, res) => {
     if (
       !name ||
       !category ||
+      !subcategory ||
       price === undefined ||
       price === null ||
       price === ""
@@ -208,7 +397,7 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "Name, category and price are required.",
+          "Name, category, subcategory and price are required.",
       });
     }
 
@@ -269,6 +458,13 @@ exports.createProduct = async (req, res) => {
       });
     }
 
+    const productStatus =
+      status === undefined
+        ? "draft"
+        : validateStatus(status, "Product status");
+    const productVariants =
+      await parseVariants(variants) || [];
+
     /**
      * -----------------------------------------------------
      * FIND SELLER STORE
@@ -296,35 +492,9 @@ exports.createProduct = async (req, res) => {
      * IMAGE UPLOAD
      * -----------------------------------------------------
      */
-    let image = "";
-
-    if (
-      req.file &&
-      req.file.buffer
-    ) {
-      const uploadResult =
-        await uploadBuffer(
-          req.file.buffer,
-          req.file.mimetype
-        );
-
-      image =
-        uploadResult.secure_url;
-    } else if (
-      req.body?.image &&
-      isBase64Image(req.body.image)
-    ) {
-      const uploadResult =
-        await uploadBase64(
-          req.body.image
-        );
-
-      image =
-        uploadResult.secure_url;
-    } else {
-      image =
-        req.body?.image || "";
-    }
+    const productImages =
+      await getProductImages(req);
+    const image = productImages[0] || "";
 
     /**
      * -----------------------------------------------------
@@ -337,11 +507,15 @@ exports.createProduct = async (req, res) => {
         description:
           description || "",
         category: category.trim(),
+        subcategory: subcategory.trim(),
         brand: brand || "",
         price: productPrice,
         rating: productRating,
         stock: productStock,
         image,
+        images: productImages,
+        status: productStatus,
+        variants: productVariants,
 
         /**
          * Automatically assign logged-in seller
@@ -432,10 +606,14 @@ exports.updateProduct = async (req, res) => {
       name,
       description,
       category,
+      subcategory,
       brand,
       price,
       rating,
       stock,
+      status,
+      variants,
+      images,
     } = req.body || {};
 
     const updateData = {};
@@ -455,6 +633,11 @@ exports.updateProduct = async (req, res) => {
     if (category !== undefined) {
       updateData.category =
         String(category).trim();
+    }
+
+    if (subcategory !== undefined) {
+      updateData.subcategory =
+        String(subcategory).trim();
     }
 
     if (brand !== undefined) {
@@ -533,37 +716,31 @@ exports.updateProduct = async (req, res) => {
         productStock;
     }
 
+    if (status !== undefined) {
+      updateData.status = validateStatus(
+        status,
+        "Product status"
+      );
+    }
+
+    if (variants !== undefined) {
+      updateData.variants =
+        await parseVariants(variants);
+    }
+
     /**
      * Image upload
      */
     if (
-      req.file &&
-      req.file.buffer
+      req.files?.image?.length ||
+      req.files?.images?.length ||
+      req.body?.image !== undefined ||
+      images !== undefined
     ) {
-      const uploadResult =
-        await uploadBuffer(
-          req.file.buffer,
-          req.file.mimetype
-        );
-
-      updateData.image =
-        uploadResult.secure_url;
-    } else if (
-      req.body?.image &&
-      isBase64Image(req.body.image)
-    ) {
-      const uploadResult =
-        await uploadBase64(
-          req.body.image
-        );
-
-      updateData.image =
-        uploadResult.secure_url;
-    } else if (
-      req.body?.image !== undefined
-    ) {
-      updateData.image =
-        req.body.image;
+      const productImages =
+        await getProductImages(req);
+      updateData.images = productImages;
+      updateData.image = productImages[0] || "";
     }
 
     /**
