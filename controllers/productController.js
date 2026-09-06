@@ -191,11 +191,166 @@ const parseVariants = async (rawVariants) => {
   }));
 };
 
-/**
- * ---------------------------------------------------------
- * REQUIRE SELLER
- * ---------------------------------------------------------
- */
+const parseStructuredArray = (rawValue, field) => {
+  if (rawValue === undefined) {
+    return undefined;
+  }
+
+  let value = rawValue;
+
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch (error) {
+      throw createValidationError(
+        `${field} must be a valid JSON array.`
+      );
+    }
+  }
+
+  if (!Array.isArray(value)) {
+    throw createValidationError(`${field} must be an array.`);
+  }
+
+  return value;
+};
+
+const parseSpecifications = (rawSpecifications) => {
+  const specifications = parseStructuredArray(
+    rawSpecifications,
+    "Specifications"
+  );
+
+  if (specifications === undefined) {
+    return undefined;
+  }
+
+  return specifications.map((specification, index) => {
+    if (
+      !specification ||
+      typeof specification !== "object" ||
+      Array.isArray(specification)
+    ) {
+      throw createValidationError(
+        `Specification ${index + 1} must be an object.`
+      );
+    }
+
+    const name = String(specification.name ?? "").trim();
+    const value = String(specification.value ?? "").trim();
+
+    if (!name || !value) {
+      throw createValidationError(
+        `Specification ${index + 1} name and value are required.`
+      );
+    }
+
+    return {
+      name,
+      value,
+      unit: String(specification.unit || "").trim(),
+    };
+  });
+};
+
+const parseAddons = async (rawAddons) => {
+  const addons = parseStructuredArray(rawAddons, "Addons");
+
+  if (addons === undefined) {
+    return undefined;
+  }
+
+  const parsedAddons = await Promise.all(addons.map(async (addon, index) => {
+    if (
+      !addon ||
+      typeof addon !== "object" ||
+      Array.isArray(addon)
+    ) {
+      throw createValidationError(
+        `Addon ${index + 1} must be an object.`
+      );
+    }
+
+    const name = String(addon.name ?? "").trim();
+    const price = Number(addon.price);
+    const maxQuantity =
+      addon.maxQuantity === undefined
+        ? 1
+        : Number(addon.maxQuantity);
+    const isRequired =
+      addon.isRequired === undefined
+        ? false
+        : addon.isRequired === true || addon.isRequired === "true";
+
+    if (!name) {
+      throw createValidationError(`Addon ${index + 1} name is required.`);
+    }
+
+    if (
+      addon.price === "" ||
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
+      throw createValidationError(
+        `Addon ${index + 1} price must be a valid non-negative number.`
+      );
+    }
+
+    if (
+      addon.isRequired !== undefined &&
+      addon.isRequired !== true &&
+      addon.isRequired !== false &&
+      addon.isRequired !== "true" &&
+      addon.isRequired !== "false"
+    ) {
+      throw createValidationError(
+        `Addon ${index + 1} isRequired must be a boolean.`
+      );
+    }
+
+    if (!Number.isInteger(maxQuantity) || maxQuantity < 1) {
+      throw createValidationError(
+        `Addon ${index + 1} maxQuantity must be a positive integer.`
+      );
+    }
+
+    if (
+      addon.status !== undefined &&
+      !["active", "inactive"].includes(addon.status)
+    ) {
+      throw createValidationError(
+        `Addon ${index + 1} status must be active or inactive.`
+      );
+    }
+
+    let image = String(addon.image || "").trim();
+    if (image && isBase64Image(image)) {
+      const uploadResult = await uploadBase64(image);
+      image = uploadResult.secure_url;
+    }
+
+    return {
+      name,
+      description: String(addon.description || "").trim(),
+      price,
+      image,
+      isRequired,
+      maxQuantity,
+      status: addon.status || "active",
+    };
+  }));
+
+  const addonNames = parsedAddons.map((addon) =>
+    addon.name.toLowerCase()
+  );
+
+  if (new Set(addonNames).size !== addonNames.length) {
+    throw createValidationError("Duplicate addon names are not allowed.");
+  }
+
+  return parsedAddons;
+};
+
 const requireSeller = async (userId) => {
   if (!userId) {
     const error = new Error("Authentication required");
@@ -224,11 +379,6 @@ const requireSeller = async (userId) => {
   return seller;
 };
 
-/**
- * ---------------------------------------------------------
- * GET ALL PRODUCTS
- * ---------------------------------------------------------
- */
 exports.getProducts = async (req, res) => {
   try {
     const products = await Product.find()
@@ -258,11 +408,6 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-/**
- * ---------------------------------------------------------
- * GET PRODUCT BY ID
- * ---------------------------------------------------------
- */
 exports.getProductById = async (req, res) => {
   try {
     const product =
@@ -302,11 +447,6 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-/**
- * ---------------------------------------------------------
- * GET SELLER PRODUCTS
- * ---------------------------------------------------------
- */
 exports.getSellerProducts = async (req, res) => {
   try {
     const userId =
@@ -353,19 +493,11 @@ exports.getSellerProducts = async (req, res) => {
   }
 };
 
-/**
- * ---------------------------------------------------------
- * CREATE PRODUCT
- * ---------------------------------------------------------
- */
+
 exports.createProduct = async (req, res) => {
   try {
     const userId =
       req.user?._id || req.user?.id;
-
-    /**
-     * Validate seller
-     */
     const seller =
       await requireSeller(userId);
 
@@ -381,11 +513,11 @@ exports.createProduct = async (req, res) => {
       status,
       variants,
       images,
+      specifications,
+      addons,
     } = req.body || {};
 
-    /**
-     * Validate required fields
-     */
+
     if (
       !name ||
       !category ||
@@ -401,9 +533,7 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    /**
-     * Validate price
-     */
+
     const productPrice =
       Number(price);
 
@@ -418,9 +548,7 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    /**
-     * Validate stock
-     */
+
     const productStock =
       stock === undefined ||
       stock === ""
@@ -438,9 +566,6 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    /**
-     * Validate rating
-     */
     const productRating =
       rating === undefined ||
       rating === ""
@@ -464,6 +589,9 @@ exports.createProduct = async (req, res) => {
         : validateStatus(status, "Product status");
     const productVariants =
       await parseVariants(variants) || [];
+    const productSpecifications =
+      parseSpecifications(specifications) || [];
+    const productAddons = await parseAddons(addons) || [];
 
     /**
      * -----------------------------------------------------
@@ -516,6 +644,8 @@ exports.createProduct = async (req, res) => {
         images: productImages,
         status: productStatus,
         variants: productVariants,
+        specifications: productSpecifications,
+        addons: productAddons,
 
         /**
          * Automatically assign logged-in seller
@@ -566,11 +696,7 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-/**
- * ---------------------------------------------------------
- * UPDATE PRODUCT
- * ---------------------------------------------------------
- */
+
 exports.updateProduct = async (req, res) => {
   try {
     const userId =
@@ -614,6 +740,8 @@ exports.updateProduct = async (req, res) => {
       status,
       variants,
       images,
+      specifications,
+      addons,
     } = req.body || {};
 
     const updateData = {};
@@ -726,6 +854,15 @@ exports.updateProduct = async (req, res) => {
     if (variants !== undefined) {
       updateData.variants =
         await parseVariants(variants);
+    }
+
+    if (specifications !== undefined) {
+      updateData.specifications =
+        parseSpecifications(specifications);
+    }
+
+    if (addons !== undefined) {
+      updateData.addons = await parseAddons(addons);
     }
 
     /**

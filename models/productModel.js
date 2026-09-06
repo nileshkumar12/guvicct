@@ -27,6 +27,74 @@ const variantSchema = new mongoose.Schema({
   _id: false,
 });
 
+const specificationSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    value: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+  },
+  { _id: false }
+);
+
+const addonSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    image: {
+      type: String,
+      default: "",
+    },
+
+    isRequired: {
+      type: Boolean,
+      default: false,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
+  },
+  { _id: true }
+);
+
+
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String },
@@ -39,6 +107,8 @@ const productSchema = new mongoose.Schema({
   image: { type: String },
   images: { type: [String], default: [] },
   variants: { type: [variantSchema], default: [] },
+  specifications: { type: [specificationSchema], default: [], },
+  addons: { type: [addonSchema],default: [],},
   status: {
     type: String,
     enum: productStatuses,
