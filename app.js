@@ -23,6 +23,10 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ecommerce-nilesh.netlify.app",
+  "http://vyason.com",
+  "https://vyason.com",
+  "http://www.vyason.com",
+  "https://www.vyason.com",
 ].filter(Boolean);
 
 app.use(
