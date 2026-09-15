@@ -1,5 +1,7 @@
 const crypto = require('crypto')
 const  Razorpay= require('razorpay')
+const Product = require('../models/productModel')
+const { calculateItemGST, calculateOrderTotals } = require('../utils/gstCalculator')
 
 
 const razorpay =new Razorpay({key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET,	})
@@ -8,8 +10,48 @@ const createRazorpayOrder =
 	async (req, res) => {
 		try {
 
-			const {	amount,	currency = 'INR',} = req.body
-			const numericAmount =Number(amount)
+			const { items, shippingAddress, shippingCost = 0, discount = 0, currency = 'INR',} = req.body
+
+			let numericAmount
+
+			if (Array.isArray(items) && items.length > 0) {
+				// Recalculate the payable amount from product + GST data, never trust a client supplied amount
+				const gstBreakups = []
+				const customerState = shippingAddress?.state || ''
+				for (const item of items) {
+					const productId = item?.productId || item?.product || item?._id
+					const product = await Product.findById(productId)
+						.select('_id name price store gstRate priceIncludesGST')
+						.populate('store', 'address')
+					if (!product) {
+						return res.status(404).json({
+							success: false,
+							message: `Product not found: ${productId}`,
+						})
+					}
+					const quantity = Number(item?.quantity)
+					if (!Number.isInteger(quantity) || quantity <= 0) {
+						return res.status(400).json({
+							success: false,
+							message: `Invalid quantity for product: ${product.name}`,
+						})
+					}
+					gstBreakups.push(calculateItemGST({
+						price: Number(product.price),
+						quantity,
+						gstRate: product.gstRate || 0,
+						priceIncludesGST: !!product.priceIncludesGST,
+						sellerState: product.store?.address?.state || '',
+						customerState,
+					}))
+				}
+				const totals = calculateOrderTotals({ items: gstBreakups, shippingCost, discount })
+				numericAmount = totals.grandTotal
+			} else {
+				const { amount } = req.body
+				numericAmount = Number(amount)
+			}
+
 			if (!Number.isFinite(numericAmount) ||numericAmount <= 0) {
 				return res.status(400)
 					.json({
@@ -33,7 +75,7 @@ const createRazorpayOrder =
 
 		} catch (error) {
 			console.error('Razorpay create order error:',error)
-			return res.status(500)
+			return res.status(error.status || 500)
 				.json({
 					success: false,
 					message: error.message ||'Unable to create Razorpay order.',

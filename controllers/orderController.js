@@ -1,11 +1,13 @@
 const mongoose = require("mongoose");
 const Order = require("../models/orderModel");
 const Product = require("../models/productModel");
+const Store = require("../models/storeModel");
 const User = require("../models/userModel");
 const SellerNotification = require("../models/sellerNotificationModel");
 const {
     sendOrderConfirmationEmail
 } = require("../utils/sendEmail");
+const { calculateItemGST, calculateOrderTotals } = require("../utils/gstCalculator");
 const ORDER_STATUS = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled",];
 const PAYMENT_METHODS = ["cod", "razorpay",];
 const getUserId = (req) => {
@@ -33,9 +35,10 @@ const requireRole = async (userId, allowedRoles) => {
     }
     return user;
 };
-const normalizeOrderItems = async (items) => {
+const normalizeOrderItems = async (items, customerState = "") => {
     const orderItems = [];
     let subtotal = 0;
+    const gstBreakups = [];
     const sellerIds = new Set();
     for (const item of items) {
         const incomingProductId = item?.productId || item?.product || item?._id;
@@ -49,7 +52,9 @@ const normalizeOrderItems = async (items) => {
             error.status = 400;
             throw error;
         }
-        const product = await Product.findById(incomingProductId).select("_id name price seller store stock");
+        const product = await Product.findById(incomingProductId)
+            .select("_id name price seller store stock hsnCode gstRate priceIncludesGST")
+            .populate("store", "address");
         if (!product) {
             const error = new Error(`Product not found: ${incomingProductId}`);
             error.status = 404;
@@ -60,7 +65,7 @@ const normalizeOrderItems = async (items) => {
             error.status = 400;
             throw error;
         }
-        if (!product.store || !isValidObjectId(product.store)) {
+        if (!product.store || !isValidObjectId(product.store?._id || product.store)) {
             const error = new Error(`Product store is missing for product: ${product.name}`);
             error.status = 400;
             throw error;
@@ -82,15 +87,34 @@ const normalizeOrderItems = async (items) => {
             error.status = 400;
             throw error;
         }
+
+        // Never trust GST/price from the frontend, always recalculate from the product record
+        const gst = calculateItemGST({
+            price,
+            quantity,
+            gstRate: product.gstRate || 0,
+            priceIncludesGST: !!product.priceIncludesGST,
+            sellerState: product.store?.address?.state || "",
+            customerState,
+        });
+
         subtotal += price * quantity;
+        gstBreakups.push(gst);
         orderItems.push({
             product: product._id,
             seller: product.seller,
-            store: product.store,
+            store: product.store?._id || product.store,
             productName: product.name,
             quantity,
             price,
             total: price * quantity,
+            hsnCode: product.hsnCode || "",
+            gstRate: product.gstRate || 0,
+            taxableAmount: gst.taxableAmount,
+            cgstAmount: gst.cgstAmount,
+            sgstAmount: gst.sgstAmount,
+            igstAmount: gst.igstAmount,
+            gstAmount: gst.gstAmount,
         });
         if (product.seller) {
             sellerIds.add(String(product.seller));
@@ -99,6 +123,7 @@ const normalizeOrderItems = async (items) => {
     return {
         orderItems,
         subtotal,
+        gstBreakups,
         sellerIds: [...sellerIds],
     };
 };
@@ -138,7 +163,6 @@ exports.placeOrder = async (req, res) => {
             cardIssuer,
             bankName,
             shippingCost = 0,
-            tax = 0,
             discount = 0,
             razorpayOrderId,
             razorpayPaymentId,
@@ -177,27 +201,19 @@ exports.placeOrder = async (req, res) => {
                 });
             }
         }
-        const { orderItems, subtotal, sellerIds,} = await normalizeOrderItems(items);
+        const { orderItems, subtotal, gstBreakups, sellerIds,} = await normalizeOrderItems(items, normalizedShippingAddress.state);
         const safeSubtotal = Number.isFinite(Number(subtotal)) ? Number(subtotal) : 0;
-        const requestedDiscount = Number(discount) || 0;
-        const safeShippingCost = Number(shippingCost) || 0;
-        const safeTax = Number(tax) || 0;
-        const positiveDiscount = Math.max(0, requestedDiscount);
-        const positiveShippingCost = Math.max(0, safeShippingCost);
-        const positiveTax = Math.max(0, safeTax);
-        const safeDiscount = Math.min(positiveDiscount, safeSubtotal);
-        const total = safeSubtotal - safeDiscount + positiveShippingCost + positiveTax;
-        /* const order = await Order.create({
-             user: userId,
-             items: orderItems,
-             shippingAddress: normalizedShippingAddress,
-             paymentMethod: resolvedPaymentMethod,
-             subtotal: safeSubtotal,
-             discount: safeDiscount,
-             shippingCost: positiveShippingCost,
-             tax: positiveTax,
-             total,
-         });*/
+        const safeShippingCost = Math.max(0, Number(shippingCost) || 0);
+
+        // GST, taxable amount and grand total are always recalculated on the backend
+        const gstTotals = calculateOrderTotals({
+            items: gstBreakups,
+            shippingCost: safeShippingCost,
+            discount,
+        });
+        const safeDiscount = gstTotals.discount;
+        const positiveShippingCost = gstTotals.shippingCost;
+        const total = gstTotals.grandTotal;
         const isRazorpay = resolvedPaymentMethod === "razorpay";
 
         const order = await Order.create({
@@ -242,8 +258,14 @@ exports.placeOrder = async (req, res) => {
                     subtotal: safeSubtotal,
                     discount: safeDiscount,
                     shippingCost: positiveShippingCost,
-                    tax: positiveTax,
+                    tax: gstTotals.gstAmount,
+                    taxableAmount: gstTotals.taxableAmount,
+                    cgstAmount: gstTotals.cgstAmount,
+                    sgstAmount: gstTotals.sgstAmount,
+                    igstAmount: gstTotals.igstAmount,
+                    gstAmount: gstTotals.gstAmount,
                     total,
+                    grandTotal: total,
                     status: isRazorpay ? "Confirmed" : "Pending",
         });
 

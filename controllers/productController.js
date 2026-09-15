@@ -1,6 +1,7 @@
 const Product = require("../models/productModel");
 const User = require("../models/userModel");
 const Store = require("../models/storeModel");
+const { validateGstRate, validateHsnCode } = require("../utils/gstCalculator");
 
 const { isBase64Image } = require("../utils/imageHelper");
 const {
@@ -515,6 +516,9 @@ exports.createProduct = async (req, res) => {
       images,
       specifications,
       addons,
+      hsnCode,
+      gstRate,
+      priceIncludesGST,
     } = req.body || {};
 
 
@@ -587,6 +591,14 @@ exports.createProduct = async (req, res) => {
       status === undefined
         ? "draft"
         : validateStatus(status, "Product status");
+
+    const productGstRate =
+      gstRate === undefined || gstRate === ""
+        ? 0
+        : validateGstRate(gstRate);
+    const productHsnCode = validateHsnCode(hsnCode);
+    const productPriceIncludesGST = priceIncludesGST === true || priceIncludesGST === "true";
+
     const productVariants =
       await parseVariants(variants) || [];
     const productSpecifications =
@@ -640,6 +652,9 @@ exports.createProduct = async (req, res) => {
         price: productPrice,
         rating: productRating,
         stock: productStock,
+        hsnCode: productHsnCode,
+        gstRate: productGstRate,
+        priceIncludesGST: productPriceIncludesGST,
         image,
         images: productImages,
         status: productStatus,
@@ -742,6 +757,9 @@ exports.updateProduct = async (req, res) => {
       images,
       specifications,
       addons,
+      hsnCode,
+      gstRate,
+      priceIncludesGST,
     } = req.body || {};
 
     const updateData = {};
@@ -842,6 +860,21 @@ exports.updateProduct = async (req, res) => {
 
       updateData.stock =
         productStock;
+    }
+
+    /**
+     * Validate GST fields
+     */
+    if (gstRate !== undefined) {
+      updateData.gstRate = gstRate === "" ? 0 : validateGstRate(gstRate);
+    }
+
+    if (hsnCode !== undefined) {
+      updateData.hsnCode = validateHsnCode(hsnCode);
+    }
+
+    if (priceIncludesGST !== undefined) {
+      updateData.priceIncludesGST = priceIncludesGST === true || priceIncludesGST === "true";
     }
 
     if (status !== undefined) {

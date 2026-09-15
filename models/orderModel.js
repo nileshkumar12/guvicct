@@ -48,7 +48,49 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    
+
+    // GST snapshot at time of purchase (product GST config can change later)
+    hsnCode: {
+      type: String,
+      default: "",
+    },
+
+    gstRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+
+    taxableAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    cgstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    sgstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    igstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    gstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { _id: false }
 );
@@ -202,7 +244,44 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
+    discount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     tax: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // Order-level GST breakup (sum of item level GST amounts)
+    taxableAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    cgstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    sgstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    igstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    gstAmount: {
       type: Number,
       default: 0,
       min: 0,
@@ -211,6 +290,13 @@ const orderSchema = new mongoose.Schema(
     total: {
       type: Number,
       required: true,
+      min: 0,
+    },
+
+    // Final payable amount = taxableAmount + gstAmount + shippingCost - discount
+    grandTotal: {
+      type: Number,
+      default: 0,
       min: 0,
     },
 

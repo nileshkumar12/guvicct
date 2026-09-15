@@ -1,4 +1,5 @@
 const Invoice = require("../models/invoiceModel");
+const { calculateItemGST, calculateOrderTotals } = require("../utils/gstCalculator");
 
 const createInvoice = async (req, res) => {
 
@@ -10,16 +11,38 @@ const createInvoice = async (req, res) => {
             customerAddress,
             date,
             status,
-            items
+            items,
+            sellerState,
+            customerState,
         } = req.body;
 
-        let grandTotal = 0;
         const itemsArray = Array.isArray(items) ? items : [];
 
-        itemsArray.forEach(item => {
-            item.total = item.qty * item.price;
-            grandTotal += item.total;
+        const gstBreakups = [];
+        const processedItems = itemsArray.map((item) => {
+            const gst = calculateItemGST({
+                price: item.price,
+                quantity: item.qty,
+                gstRate: item.gstRate || 0,
+                priceIncludesGST: !!item.priceIncludesGST,
+                sellerState: sellerState || "",
+                customerState: customerState || "",
+            });
+            gstBreakups.push(gst);
+            return {
+                ...item,
+                hsnCode: item.hsnCode || "",
+                gstRate: item.gstRate || 0,
+                taxableAmount: gst.taxableAmount,
+                cgstAmount: gst.cgstAmount,
+                sgstAmount: gst.sgstAmount,
+                igstAmount: gst.igstAmount,
+                gstAmount: gst.gstAmount,
+                total: gst.totalAmount,
+            };
         });
+
+        const totals = calculateOrderTotals({ items: gstBreakups });
 
         const invoice = await Invoice.create({
 
@@ -35,9 +58,14 @@ const createInvoice = async (req, res) => {
 
             status,
 
-            items: itemsArray,
+            items: processedItems,
 
-            grandTotal
+            taxableAmount: totals.taxableAmount,
+            cgstAmount: totals.cgstAmount,
+            sgstAmount: totals.sgstAmount,
+            igstAmount: totals.igstAmount,
+            gstAmount: totals.gstAmount,
+            grandTotal: totals.grandTotal
 
         });
 
@@ -51,7 +79,7 @@ const createInvoice = async (req, res) => {
 
     } catch (error) {
 
-        res.status(500).json({
+        res.status(error.status || 500).json({
 
             success: false,
 

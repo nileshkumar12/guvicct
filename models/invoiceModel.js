@@ -14,6 +14,36 @@ const itemSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    hsnCode: {
+        type: String,
+        default: ""
+    },
+    gstRate: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+    taxableAmount: {
+        type: Number,
+        default: 0
+    },
+    cgstAmount: {
+        type: Number,
+        default: 0
+    },
+    sgstAmount: {
+        type: Number,
+        default: 0
+    },
+    igstAmount: {
+        type: Number,
+        default: 0
+    },
+    gstAmount: {
+        type: Number,
+        default: 0
+    },
     total: {
         type: Number,
         required: true
@@ -55,6 +85,31 @@ const invoiceSchema = new mongoose.Schema({
     },
 
     items: [itemSchema],
+
+    taxableAmount: {
+        type: Number,
+        default: 0
+    },
+
+    cgstAmount: {
+        type: Number,
+        default: 0
+    },
+
+    sgstAmount: {
+        type: Number,
+        default: 0
+    },
+
+    igstAmount: {
+        type: Number,
+        default: 0
+    },
+
+    gstAmount: {
+        type: Number,
+        default: 0
+    },
 
     grandTotal: {
         type: Number,
