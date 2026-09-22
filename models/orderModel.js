@@ -302,6 +302,18 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
+      set: (value) => {
+        if (typeof value !== "string") return value;
+        const normalized = value.trim();
+        const statusMap = {
+          pending: "Pending",
+          confirmed: "Confirmed",
+          shipped: "Shipped",
+          delivered: "Delivered",
+          cancelled: "Cancelled",
+        };
+        return statusMap[normalized.toLowerCase()] || normalized;
+      },
       enum: [
         "Pending",
         "Confirmed",

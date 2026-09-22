@@ -362,7 +362,7 @@ exports.cancelShipment = async (req, res) => {
     });
 
     if (order) {
-      order.status = "cancelled";
+      order.status = "Cancelled";
       await order.save();
     }
 
