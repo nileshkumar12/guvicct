@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const {
   getProducts,
   getProductById,
+  getTrendingProducts,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -29,6 +30,7 @@ const productImageUpload = upload.fields([
 ]);
 
 router.get('/', getProducts);
+router.get('/trending', getTrendingProducts);
 router.get('/:id', getProductById);
 router.post('/', auth, productImageUpload, createProduct);
 router.put('/:id', auth, productImageUpload, updateProduct);

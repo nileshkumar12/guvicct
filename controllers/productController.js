@@ -1,6 +1,7 @@
 const Product = require("../models/productModel");
 const User = require("../models/userModel");
 const Store = require("../models/storeModel");
+const Order = require("../models/orderModel");
 const { validateGstRate, validateHsnCode } = require("../utils/gstCalculator");
 
 const { isBase64Image } = require("../utils/imageHelper");
@@ -444,6 +445,115 @@ exports.getProductById = async (req, res) => {
       message:
         error.message ||
         "Failed to fetch product",
+    });
+  }
+};
+
+exports.getTrendingProducts = async (req, res) => {
+  try {
+    const recentOrders = await Order.find({
+      paymentStatus: "Paid",
+      status: { $ne: "Cancelled" },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .populate({
+        path: "items.product",
+        populate: [
+          { path: "seller", select: "name email" },
+          { path: "store", select: "storeName slug logo" },
+        ],
+      })
+      .lean();
+
+    const salesByProduct = new Map();
+
+    recentOrders.forEach((order) => {
+      if (!Array.isArray(order.items)) {
+        return;
+      }
+
+      order.items.forEach((item) => {
+        const productRef = item.product;
+        const productId = productRef
+          ? String(productRef._id || productRef)
+          : null;
+
+        if (!productId) {
+          return;
+        }
+
+        const quantity = Number(item.quantity) || 0;
+        if (quantity <= 0) {
+          return;
+        }
+
+        const existing = salesByProduct.get(productId) || {
+          productId,
+          quantity: 0,
+        };
+
+        existing.quantity += quantity;
+        salesByProduct.set(productId, existing);
+      });
+    });
+
+    const productIds = [...salesByProduct.keys()];
+
+    if (productIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+      });
+    }
+
+    const products = await Product.find({
+      _id: { $in: productIds },
+    })
+      .populate("seller", "name email")
+      .populate("store", "storeName slug logo")
+      .lean();
+
+    const productMap = new Map(
+      products.map((product) => [String(product._id), product])
+    );
+
+    const trendingProducts = [...salesByProduct.values()]
+      .map((entry) => {
+        const product = productMap.get(entry.productId);
+
+        if (!product) {
+          return null;
+        }
+
+        return {
+          ...product,
+          totalSoldQuantity: entry.quantity,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (b.totalSoldQuantity !== a.totalSoldQuantity) {
+          return b.totalSoldQuantity - a.totalSoldQuantity;
+        }
+
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      })
+      .slice(0, 10);
+
+    return res.status(200).json({
+      success: true,
+      count: trendingProducts.length,
+      data: trendingProducts,
+    });
+  } catch (error) {
+    console.error("Get trending products error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message || "Failed to fetch trending products",
     });
   }
 };
