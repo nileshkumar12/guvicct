@@ -132,7 +132,7 @@ const normalizeOrderItems = async (
 
         const incomingProductId =
             typeof rawProductId === "object" &&
-            rawProductId !== null
+                rawProductId !== null
                 ? rawProductId._id || rawProductId.id
                 : rawProductId;
 
@@ -241,13 +241,13 @@ const normalizeOrderItems = async (
 
         const variantInput =
             item?.variant &&
-            typeof item.variant === "object"
+                typeof item.variant === "object"
                 ? item.variant
                 : {};
 
         const selectedVariantInput =
             item?.selectedVariant &&
-            typeof item.selectedVariant === "object"
+                typeof item.selectedVariant === "object"
                 ? item.selectedVariant
                 : {};
 
@@ -433,10 +433,10 @@ const normalizeOrderItems = async (
 
             const rawAddonId =
                 typeof selection === "object" &&
-                selection !== null
+                    selection !== null
                     ? selection.addonId ||
-                      selection._id ||
-                      selection.id
+                    selection._id ||
+                    selection.id
                     : selection;
 
 
@@ -588,16 +588,16 @@ const normalizeOrderItems = async (
                     variantName:
                         variant
                             ? variant.name ||
-                              Object.entries(
-                                  variantAttributes
-                              )
-                                  .map(
-                                      ([name, value]) =>
-                                          `${name}: ${value}`
-                                  )
-                                  .join(" / ") ||
-                              variant.sku ||
-                              ""
+                            Object.entries(
+                                variantAttributes
+                            )
+                                .map(
+                                    ([name, value]) =>
+                                        `${name}: ${value}`
+                                )
+                                .join(" / ") ||
+                            variant.sku ||
+                            ""
                             : "",
 
                     variantAttributes,
@@ -775,10 +775,10 @@ const normalizeOrderItems = async (
 
             variant:
                 grouped.variantId ||
-                grouped.variantSku ||
-                Object.keys(
-                    grouped.variantAttributes || {}
-                ).length
+                    grouped.variantSku ||
+                    Object.keys(
+                        grouped.variantAttributes || {}
+                    ).length
                     ? {
                         variantId:
                             grouped.variantId ||
@@ -1402,7 +1402,7 @@ exports.placeOrder =
                         );
 
                 } catch (
-                    notifyError
+                notifyError
                 ) {
 
                     console.error(
