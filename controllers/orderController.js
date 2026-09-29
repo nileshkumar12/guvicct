@@ -245,28 +245,32 @@ const normalizeOrderItems = async (
                 ? item.variant
                 : {};
 
-        const selectedVariantInput =
-            item?.selectedVariant &&
-                typeof item.selectedVariant === "object"
-                ? item.selectedVariant
-                : {};
+                const selectedVariantValue = item?.selectedVariant;
 
-
-        /* -----------------------------------------------------
-           VARIANT ID
-        ----------------------------------------------------- */
-
-        const requestedVariantId = String(
-            item?.variantId ||
-            item?.variant_id ||
-            variantInput.variantId ||
-            variantInput._id ||
-            variantInput.id ||
-            selectedVariantInput.variantId ||
-            selectedVariantInput._id ||
-            selectedVariantInput.id ||
-            ""
-        );
+                const selectedVariantInput =
+                    selectedVariantValue &&
+                    typeof selectedVariantValue === "object" &&
+                    !Array.isArray(selectedVariantValue)
+                        ? selectedVariantValue
+                        : {};
+                
+                const selectedVariantString =
+                    typeof selectedVariantValue === "string"
+                        ? selectedVariantValue.trim()
+                        : "";
+                
+                const requestedVariantId = String(
+                    item?.variantId ||
+                    item?.variant_id ||
+                    variantInput.variantId ||
+                    variantInput._id ||
+                    variantInput.id ||
+                    selectedVariantInput.variantId ||
+                    selectedVariantInput._id ||
+                    selectedVariantInput.id ||
+                    selectedVariantString ||
+                    ""
+                ).trim();
 
 
         /* -----------------------------------------------------
@@ -280,8 +284,7 @@ const normalizeOrderItems = async (
             variantInput.sku ||
             selectedVariantInput.sku ||
             ""
-        );
-
+        ).trim();
 
         /* -----------------------------------------------------
            VARIANT ATTRIBUTES
@@ -340,70 +343,55 @@ const normalizeOrderItems = async (
 
         if (hasVariantSelection) {
 
-            variant = variants.find(
-                (candidate) => {
-
-                    const candidateId =
-                        String(
-                            candidate._id ||
-                            candidate.variantId ||
-                            ""
-                        );
-
-
-                    /* Variant ID */
-
-                    if (
-                        requestedVariantId &&
-                        requestedVariantId !== candidateId &&
-                        requestedVariantId !==
-                        String(
-                            candidate.sku || ""
-                        )
-                    ) {
-                        return false;
-                    }
-
-
-                    /* Variant SKU */
-
-                    if (
-                        requestedSku &&
-                        requestedSku !==
-                        String(
-                            candidate.sku || ""
-                        )
-                    ) {
-                        return false;
-                    }
-
-
-                    /* Variant Attributes */
-
-                    if (
-                        hasSelectedAttributes &&
-                        !attributesMatch(
-                            candidate.attributes,
-                            requestedAttributes
-                        )
-                    ) {
-                        return false;
-                    }
-
-
-                    return true;
+            variant = variants.find((candidate) => {
+                const candidateId = String(
+                    candidate._id ||
+                    candidate.id ||
+                    candidate.variantId ||
+                    ""
+                ).trim();
+            
+                const candidateSku = String(
+                    candidate.sku || ""
+                ).trim();
+            
+                // Variant ID match
+                if (
+                    requestedVariantId &&
+                    requestedVariantId !== candidateId &&
+                    requestedVariantId !== candidateSku
+                ) {
+                    return false;
                 }
-            );
+            
+                // SKU match
+                if (
+                    requestedSku &&
+                    requestedSku !== candidateSku
+                ) {
+                    return false;
+                }
+            
+                // Attributes match
+                if (
+                    hasSelectedAttributes &&
+                    !attributesMatch(
+                        candidate.attributes,
+                        requestedAttributes
+                    )
+                ) {
+                    return false;
+                }
+            
+                return true;
+            });
 
 
-            if (!variant) {
-
-                const error = new Error(
-                    `Selected variant is unavailable for product: ${product.name}`
+            if (hasVariantSelection && !variant) {
+                throw new Error(
+                    `Selected variant not found for product: ${product.name}. ` +
+                    `variantId=${requestedVariantId}, sku=${requestedSku}`
                 );
-
-                error.status = 400;
-                throw error;
             }
         }
 
