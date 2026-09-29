@@ -8,6 +8,7 @@ const {
     sendOrderConfirmationEmail
 } = require("../utils/sendEmail");
 const { calculateItemGST, calculateOrderTotals } = require("../utils/gstCalculator");
+const { resolveOrderRequestMetadata } = require("../utils/orderRequestMetadata");
 const ORDER_STATUS = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled",];
 const PAYMENT_METHODS = ["cod", "razorpay",];
 const getUserId = (req) => {
@@ -35,13 +36,32 @@ const requireRole = async (userId, allowedRoles) => {
     }
     return user;
 };
+const toAttributeObject = (attributes) => {
+    if (attributes instanceof Map) return Object.fromEntries(attributes);
+    if (attributes?.toObject) return attributes.toObject();
+    return attributes && typeof attributes === "object" && !Array.isArray(attributes)
+        ? attributes
+        : {};
+};
+const attributesMatch = (catalogAttributes, selectedAttributes) => {
+    const catalog = toAttributeObject(catalogAttributes);
+    const selected = toAttributeObject(selectedAttributes);
+    const catalogEntries = Object.entries(catalog).sort(([left], [right]) => left.localeCompare(right));
+    const selectedEntries = Object.entries(selected).sort(([left], [right]) => left.localeCompare(right));
+    return catalogEntries.length === selectedEntries.length && catalogEntries.every(
+        ([key, value], index) => key === selectedEntries[index][0] && String(value) === String(selectedEntries[index][1])
+    );
+};
 const normalizeOrderItems = async (items, customerState = "") => {
-    const orderItems = [];
-    let subtotal = 0;
+    const groupedItems = new Map();
     const gstBreakups = [];
     const sellerIds = new Set();
+
     for (const item of items) {
-        const incomingProductId = item?.productId || item?.product || item?._id;
+        const rawProductId = item?.productId || item?.product || item?._id;
+        const incomingProductId = typeof rawProductId === "object" && rawProductId !== null
+            ? rawProductId._id || rawProductId.id
+            : rawProductId;
         if (!incomingProductId) {
             const error = new Error("Product ID is required");
             error.status = 400;
@@ -53,7 +73,7 @@ const normalizeOrderItems = async (items, customerState = "") => {
             throw error;
         }
         const product = await Product.findById(incomingProductId)
-            .select("_id name price seller store stock hsnCode gstRate priceIncludesGST")
+            .select("_id name price seller store stock hsnCode gstRate priceIncludesGST variants addons")
             .populate("store", "address");
         if (!product) {
             const error = new Error(`Product not found: ${incomingProductId}`);
@@ -70,25 +90,132 @@ const normalizeOrderItems = async (items, customerState = "") => {
             error.status = 400;
             throw error;
         }
-        const quantity = Number(item?.quantity);
+        const quantity = Number(item?.quantity ?? item?.qty ?? 1);
         if (!Number.isInteger(quantity) || quantity <= 0) {
             const error = new Error(`Invalid quantity for product: ${product.name}`);
             error.status = 400;
             throw error;
         }
-        if (product.stock !== undefined && product.stock !== null && quantity > Number(product.stock)) {
-            const error = new Error(`Insufficient stock for product: ${product.name}. Available stock: ${product.stock}`);
+
+        const variantInput = item?.variant && typeof item.variant === "object" ? item.variant : {};
+        const requestedVariantId = String(
+            item?.variantId || variantInput.variantId || variantInput._id || variantInput.id || ""
+        );
+        const requestedSku = String(item?.variantSku || item?.variantSKU || item?.sku || variantInput.sku || "");
+        const requestedAttributes = item?.variantAttributes || item?.selectedAttributes ||
+            variantInput.attributes || item?.attributes || {};
+        const hasSelectedAttributes = Object.keys(toAttributeObject(requestedAttributes)).length > 0;
+        const hasVariantSelection = Boolean(requestedVariantId || requestedSku || hasSelectedAttributes);
+        const variants = product.variants || [];
+        let variant = null;
+
+        if (variants.length && !hasVariantSelection) {
+            const error = new Error(`A variant must be selected for product: ${product.name}`);
             error.status = 400;
             throw error;
         }
-        const price = Number(product.price);
-        if (!Number.isFinite(price) || price < 0) {
+        if (hasVariantSelection) {
+            variant = variants.find((candidate) => {
+                const candidateId = String(candidate._id || candidate.variantId || "");
+                if (requestedVariantId && requestedVariantId !== candidateId && requestedVariantId !== String(candidate.sku || "")) return false;
+                if (requestedSku && requestedSku !== String(candidate.sku || "")) return false;
+                if (hasSelectedAttributes && !attributesMatch(candidate.attributes, requestedAttributes)) return false;
+                return true;
+            });
+            if (!variant) {
+                const error = new Error(`Selected variant is unavailable for product: ${product.name}`);
+                error.status = 400;
+                throw error;
+            }
+        }
+
+        const requestedAddons = item?.addons ?? item?.selectedAddons ?? [];
+        if (!Array.isArray(requestedAddons)) {
+            const error = new Error(`Invalid addons for product: ${product.name}`);
+            error.status = 400;
+            throw error;
+        }
+        const selectedAddons = new Map();
+        for (const selection of requestedAddons) {
+            const rawAddonId = typeof selection === "object" && selection !== null
+                ? selection.addonId || selection._id || selection.id
+                : selection;
+            const addon = (product.addons || []).find((candidate) => String(candidate._id) === String(rawAddonId));
+            if (!addon || addon.status !== "active") {
+                const error = new Error(`Selected addon is unavailable for product: ${product.name}`);
+                error.status = 400;
+                throw error;
+            }
+            const addonQuantity = Number(typeof selection === "object" ? selection.quantity ?? 1 : 1);
+            if (!Number.isInteger(addonQuantity) || addonQuantity < 1 || addonQuantity > Number(addon.maxQuantity || 1)) {
+                const error = new Error(`Invalid addon quantity for ${addon.name}`);
+                error.status = 400;
+                throw error;
+            }
+            const key = String(addon._id);
+            const previous = selectedAddons.get(key);
+            const combinedQuantity = addonQuantity + (previous?.quantity || 0);
+            if (combinedQuantity > Number(addon.maxQuantity || 1)) {
+                const error = new Error(`Invalid addon quantity for ${addon.name}`);
+                error.status = 400;
+                throw error;
+            }
+            selectedAddons.set(key, {
+                addonId: key,
+                name: addon.name,
+                price: Number(addon.price),
+                quantity: combinedQuantity,
+            });
+        }
+
+        const normalizedVariantId = variant ? String(variant._id || variant.variantId || variant.sku) : "";
+        const variantAttributes = variant ? toAttributeObject(variant.attributes) : {};
+        const addons = [...selectedAddons.values()].sort((left, right) => left.addonId.localeCompare(right.addonId));
+        const key = JSON.stringify([
+            String(product._id),
+            normalizedVariantId,
+            addons.map((addon) => [addon.addonId, addon.quantity]),
+        ]);
+        const grouped = groupedItems.get(key);
+        if (grouped) {
+            grouped.quantity += quantity;
+        } else {
+            groupedItems.set(key, {
+                product,
+                quantity,
+                variant,
+                variantId: normalizedVariantId,
+                variantSku: variant?.sku || "",
+                variantName: variant
+                    ? variant.name || Object.entries(variantAttributes).map(([name, value]) => `${name}: ${value}`).join(" / ") || variant.sku || ""
+                    : "",
+                variantAttributes,
+                addons,
+            });
+        }
+    }
+
+    const orderItems = [];
+    let subtotal = 0;
+    for (const grouped of groupedItems.values()) {
+        const { product, quantity, variant, addons } = grouped;
+        const stock = variant ? variant.stock : product.stock;
+        if (stock !== undefined && stock !== null && quantity > Number(stock)) {
+            const error = new Error(`Insufficient stock for product: ${product.name}. Available stock: ${stock}`);
+            error.status = 400;
+            throw error;
+        }
+        const basePrice = Number(variant?.price ?? product.price);
+        if (!Number.isFinite(basePrice) || basePrice < 0 || addons.some((addon) => !Number.isFinite(addon.price) || addon.price < 0)) {
             const error = new Error(`Invalid price for product: ${product.name}`);
             error.status = 400;
             throw error;
         }
-
-        // Never trust GST/price from the frontend, always recalculate from the product record
+        const price = basePrice + addons.reduce((sum, addon) => sum + addon.price * addon.quantity, 0);
+        const addonSnapshots = addons.map((addon) => ({
+            ...addon,
+            total: addon.price * addon.quantity * quantity,
+        }));
         const gst = calculateItemGST({
             price,
             quantity,
@@ -97,17 +224,22 @@ const normalizeOrderItems = async (items, customerState = "") => {
             sellerState: product.store?.address?.state || "",
             customerState,
         });
-
-        subtotal += price * quantity;
+        const total = price * quantity;
+        subtotal += total;
         gstBreakups.push(gst);
         orderItems.push({
             product: product._id,
             seller: product.seller,
             store: product.store?._id || product.store,
             productName: product.name,
+            variantId: grouped.variantId,
+            variantSku: grouped.variantSku,
+            variantName: grouped.variantName,
+            variantAttributes: grouped.variantAttributes,
+            addons: addonSnapshots,
             quantity,
             price,
-            total: price * quantity,
+            total,
             hsnCode: product.hsnCode || "",
             gstRate: product.gstRate || 0,
             taxableAmount: gst.taxableAmount,
@@ -116,9 +248,7 @@ const normalizeOrderItems = async (items, customerState = "") => {
             igstAmount: gst.igstAmount,
             gstAmount: gst.gstAmount,
         });
-        if (product.seller) {
-            sellerIds.add(String(product.seller));
-        }
+        if (product.seller) sellerIds.add(String(product.seller));
     }
     return {
         orderItems,
@@ -215,10 +345,12 @@ exports.placeOrder = async (req, res) => {
         const positiveShippingCost = gstTotals.shippingCost;
         const total = gstTotals.grandTotal;
         const isRazorpay = resolvedPaymentMethod === "razorpay";
+        const requestMetadata = await resolveOrderRequestMetadata(req);
 
         const order = await Order.create({
                     user: userId,
                     items: orderItems,
+                requestMetadata,
                     shippingAddress: normalizedShippingAddress,
                     paymentMethod: resolvedPaymentMethod,
                     paymentType: isRazorpay

@@ -31,6 +31,43 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
     },
 
+    variantId: {
+      type: String,
+      default: "",
+    },
+
+    variantSku: {
+      type: String,
+      default: "",
+    },
+
+    variantName: {
+      type: String,
+      default: "",
+    },
+
+    variantAttributes: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+
+    addons: {
+      type: [
+        new mongoose.Schema(
+          {
+            addonId: { type: String, required: true },
+            name: { type: String, required: true },
+            price: { type: Number, required: true, min: 0 },
+            quantity: { type: Number, required: true, min: 1 },
+            total: { type: Number, required: true, min: 0 },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
     quantity: {
       type: Number,
       required: true,
@@ -95,6 +132,22 @@ const orderItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const requestMetadataSchema = new mongoose.Schema(
+  {
+    ipAddress: { type: String, default: "" },
+    location: {
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      country: { type: String, default: "" },
+    },
+    browser: { type: String, default: "" },
+    operatingSystem: { type: String, default: "" },
+    deviceType: { type: String, default: "" },
+    userAgent: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const addressSchema = new mongoose.Schema(
   {
     line1: {
@@ -154,9 +207,33 @@ const orderSchema = new mongoose.Schema(
       type: [orderItemSchema],
       required: true,
       validate: {
-        validator: (items) => items.length > 0,
-        message: "Order must contain at least one item",
+        validator: (items) => {
+          if (!Array.isArray(items)) return false;
+          if (!items.length) return false;
+          const seen = new Set();
+          for (const item of items) {
+            const addons = (item.addons || [])
+              .map((addon) => [String(addon.addonId), Number(addon.quantity)])
+              .sort(([leftId, leftQuantity], [rightId, rightQuantity]) =>
+                leftId.localeCompare(rightId) || leftQuantity - rightQuantity
+              );
+            const key = JSON.stringify([
+              String(item.product),
+              item.variantId || "",
+              addons,
+            ]);
+            if (seen.has(key)) return false;
+            seen.add(key);
+          }
+          return true;
+        },
+        message: "Order items must be unique by product, variant, and addons",
       },
+    },
+
+    requestMetadata: {
+      type: requestMetadataSchema,
+      default: () => ({}),
     },
 
     shippingAddress: {

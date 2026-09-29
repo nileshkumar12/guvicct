@@ -8,6 +8,7 @@ const productStatuses = [
 ];
 
 const variantSchema = new mongoose.Schema({
+  name: { type: String, default: "", trim: true },
   attributes: { 
     type: Map,
     of: String,
@@ -23,8 +24,6 @@ const variantSchema = new mongoose.Schema({
     enum: productStatuses,
     default: 'draft',
   },
-}, {
-  _id: false,
 });
 
 const specificationSchema = new mongoose.Schema(

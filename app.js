@@ -20,6 +20,15 @@ const conntactEmailRoutes = require("./routes/sendcontactemailRouter");
 const cors = require("cors");
 const path = require("path");
 const app = express();
+const trustProxySetting = process.env.TRUST_PROXY?.trim();
+if (trustProxySetting && trustProxySetting !== "false") {
+  const trustProxy = trustProxySetting === "true"
+    ? true
+    : /^\d+$/.test(trustProxySetting)
+      ? Number(trustProxySetting)
+      : trustProxySetting.split(",").map((entry) => entry.trim());
+  app.set("trust proxy", trustProxy);
+}
 const allowedOrigins = [
   "http://localhost:5173",
   "https://ecommerce-nilesh.netlify.app",
