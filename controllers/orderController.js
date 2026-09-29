@@ -342,56 +342,40 @@ const normalizeOrderItems = async (
         ----------------------------------------------------- */
 
         if (hasVariantSelection) {
+            const getVariantId = (candidate) => String(
+                candidate._id ||
+                candidate.id ||
+                candidate.variantId ||
+                ""
+            ).trim();
+            const getVariantSku = (candidate) => String(candidate.sku || "").trim();
 
-            variant = variants.find((candidate) => {
-                const candidateId = String(
-                    candidate._id ||
-                    candidate.id ||
-                    candidate.variantId ||
-                    ""
-                ).trim();
-            
-                const candidateSku = String(
-                    candidate.sku || ""
-                ).trim();
-            
-                // Variant ID match
-                if (
-                    requestedVariantId &&
-                    requestedVariantId !== candidateId &&
-                    requestedVariantId !== candidateSku
-                ) {
-                    return false;
-                }
-            
-                // SKU match
-                if (
-                    requestedSku &&
-                    requestedSku !== candidateSku
-                ) {
-                    return false;
-                }
-            
-                // Attributes match
-                if (
-                    hasSelectedAttributes &&
-                    !attributesMatch(
-                        candidate.attributes,
-                        requestedAttributes
-                    )
-                ) {
-                    return false;
-                }
-            
-                return true;
-            });
+            variant = requestedVariantId
+                ? variants.find((candidate) =>
+                    requestedVariantId === getVariantId(candidate) ||
+                    requestedVariantId === getVariantSku(candidate)
+                )
+                : null;
 
+            if (!variant && requestedSku) {
+                variant = variants.find(
+                    (candidate) => requestedSku === getVariantSku(candidate)
+                );
+            }
 
-            if (hasVariantSelection && !variant) {
-                throw new Error(
+            if (!variant && hasSelectedAttributes) {
+                variant = variants.find((candidate) =>
+                    attributesMatch(candidate.attributes, requestedAttributes)
+                );
+            }
+
+            if (!variant) {
+                const error = new Error(
                     `Selected variant not found for product: ${product.name}. ` +
                     `variantId=${requestedVariantId}, sku=${requestedSku}`
                 );
+                error.status = 400;
+                throw error;
             }
         }
 
