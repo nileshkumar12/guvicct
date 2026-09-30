@@ -1745,7 +1745,7 @@ exports.sellerOrderById = async (req, res) => {
             ["seller", "admin"]
         );
 
-        const { orderId } = req.params;
+        const { id: orderId } = req.params;
 
         if (!orderId) {
             return res.status(400).json({
