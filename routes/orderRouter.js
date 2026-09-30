@@ -12,7 +12,7 @@ const {
   adminOrders,
   adminOrderDetails,
   cancelOrder,
-  deleteBuyerOrderHistory,
+  deleteBuyerOrderHistory,sellerOrderById,
 } = require("../controllers/orderController");
 
 // Buyer
@@ -21,7 +21,7 @@ router.get("/", authMiddleware, buyerOrders);
 router.get("/:id", authMiddleware, orderDetails);
 router.put( "/:id/cancel", authMiddleware, cancelOrder);
 router.delete( "/:id/history", authMiddleware, deleteBuyerOrderHistory);
-
+router.get("/seller/orders/:orderId", authMiddleware, sellerOrderById);
 // Seller
 router.get(  "/seller/orders", authMiddleware, sellerOrders);
 router.put( "/seller/orders/:id/status", authMiddleware, updateSellerOrderStatus);

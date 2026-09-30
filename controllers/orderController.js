@@ -1733,6 +1733,100 @@ exports.sellerOrders =
         }
     };
 
+/* =========================================================
+   SELLER ORDERS by id
+========================================================= */
+exports.sellerOrderById = async (req, res) => {
+    try {
+        const userId = getUserId(req);
+
+        const seller = await requireRole(
+            userId,
+            ["seller", "admin"]
+        );
+
+        const { orderId } = req.params;
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: "Order ID is required",
+            });
+        }
+
+        const sellerProductIds =
+            await getSellerProductIds(seller._id);
+
+        if (!sellerProductIds.length) {
+            return res.status(404).json({
+                success: false,
+                message: "No products found for this seller",
+            });
+        }
+
+        const order = await Order.findOne({
+            _id: orderId,
+            "items.product": {
+                $in: sellerProductIds,
+            },
+        })
+            .populate("items.product")
+            .populate(
+                "user",
+                "name email role"
+            );
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found",
+            });
+        }
+
+        // Only seller's products
+        const sellerItems = order.items.filter(
+            (item) => {
+                const productId =
+                    item.product?._id?.toString() ||
+                    item.product?.toString();
+
+                return sellerProductIds.some(
+                    (id) =>
+                        id.toString() === productId
+                );
+            }
+        );
+
+        return res.status(200).json({
+            success: true,
+
+            data: {
+                ...order.toObject(),
+
+                // Only this seller's products
+                items: sellerItems,
+
+                // Useful for frontend
+                sellerId: seller._id,
+            },
+        });
+
+    } catch (error) {
+        console.error(
+            "Seller order details error:",
+            error
+        );
+
+        return res.status(
+            error.status || 500
+        ).json({
+            success: false,
+            message:
+                error.message ||
+                "Failed to fetch seller order",
+        });
+    }
+};
 
 /* =========================================================
    UPDATE SELLER ORDER STATUS
