@@ -6,15 +6,20 @@ const chatbotErrorMiddleware = (error, req, res, next) => {
     console.error("Chatbot request failed:", {
       requestId: req.id,
       message: error.message,
+      code: error.code,
     });
   }
 
+  const message =
+    error.code === "DATABASE_UNAVAILABLE"
+      ? error.message
+      : status >= 500
+        ? "Unable to process your chatbot request. Please try again."
+        : error.message;
+
   return res.status(status).json({
     success: false,
-    message:
-      status >= 500
-        ? "Unable to process your chatbot request. Please try again."
-        : error.message,
+    message,
     ...(error.code ? { code: error.code } : {}),
   });
 };

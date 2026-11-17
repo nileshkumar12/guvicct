@@ -219,7 +219,11 @@ const recommendations = async (req, res) => {
     throw createHttpError(400, "A JSON request body is required.");
   }
   const query = optionalText(body, "query", { max: 300 });
-  const filters = query ? await extractProductFilters(query) : normalizeFilters(body);
+  const { filters, fallbackUsed } = await resolveRecommendationFilters({
+    body,
+    query,
+    requestId: req.id,
+  });
   const productId = optionalText(body, "productId", { min: 24, max: 24 });
   const limit = parseNumber(body.limit, "limit", 8);
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
@@ -231,15 +235,62 @@ const recommendations = async (req, res) => {
     productId,
     limit,
   });
+  const message = products.length
+    ? fallbackUsed
+      ? "AI-assisted matching is unavailable; these results match the live product catalog."
+      : "Here are some products you may like!"
+    : "I couldn't find matching products right now.";
   return res.json({
     success: true,
     intent: "recommendations",
-    message: products.length
-      ? "Here are some products you may like!"
-      : "I couldn't find matching products right now.",
+    message,
+    fallbackUsed,
     products,
     suggestions: defaultSuggestions,
   });
+};
+
+const resolveRecommendationFilters = async ({
+  body,
+  query,
+  requestId,
+  extractFilters = extractProductFilters,
+}) => {
+  const directFilters = normalizeFilters(body);
+  if (!query) return { filters: directFilters, fallbackUsed: false };
+
+  const hasStructuredFilter = [
+    "keyword",
+    "category",
+    "subcategory",
+    "brand",
+    "vendor",
+    "minPrice",
+    "maxPrice",
+    "availability",
+  ].some((key) => body[key] !== undefined && body[key] !== "");
+  if (hasStructuredFilter) {
+    return {
+      filters: {
+        ...directFilters,
+        keyword: directFilters.keyword || query,
+      },
+      fallbackUsed: false,
+    };
+  }
+
+  try {
+    return { filters: await extractFilters(query), fallbackUsed: false };
+  } catch (error) {
+    console.warn("Recommendation query interpretation failed; using catalog search.", {
+      requestId,
+      code: error.code,
+    });
+    return {
+      filters: { ...directFilters, keyword: query },
+      fallbackUsed: true,
+    };
+  }
 };
 
 const orderStatus = async (req, res) => {
@@ -264,5 +315,6 @@ module.exports = {
   deleteConversation,
   productSearch,
   recommendations,
+  resolveRecommendationFilters,
   orderStatus,
 };

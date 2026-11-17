@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const { after, before, test } = require("node:test");
 const app = require("../app");
+const mongoose = require("mongoose");
+const { resolveRecommendationFilters } = require("../controllers/chatbotController");
 const { formatProduct } = require("../services/productSearchService");
 
 let server;
@@ -61,6 +63,50 @@ test("requires authentication for order assistance", async () => {
   const response = await postJson("/order-status", {});
   assert.equal(response.status, 401);
   assert.equal((await response.json()).success, false);
+});
+
+test("falls back to live catalog keyword search when AI filter extraction fails", async () => {
+  const result = await resolveRecommendationFilters({
+    body: {},
+    query: "blue jacket",
+    requestId: "test-request",
+    extractFilters: async () => {
+      const error = new Error("OpenAI is not configured.");
+      error.status = 503;
+      error.code = "AI_NOT_CONFIGURED";
+      throw error;
+    },
+  });
+
+  assert.equal(result.fallbackUsed, true);
+  assert.equal(result.filters.keyword, "blue jacket");
+});
+
+test("uses explicit recommendation filters without invoking AI", async () => {
+  const result = await resolveRecommendationFilters({
+    body: { category: "clothing" },
+    query: "blue jacket",
+    extractFilters: async () => {
+      throw new Error("AI should not be called for structured filters.");
+    },
+  });
+
+  assert.equal(result.fallbackUsed, false);
+  assert.equal(result.filters.category, "clothing");
+  assert.equal(result.filters.keyword, "blue jacket");
+});
+
+test("returns a meaningful 503 when recommendation catalog data is unavailable", async (t) => {
+  if (mongoose.connection.readyState === 1) {
+    t.skip("Requires an unconnected MongoDB instance.");
+    return;
+  }
+
+  const response = await postJson("/recommendations", {});
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.code, "DATABASE_UNAVAILABLE");
+  assert.match(body.message, /product catalog is temporarily unavailable/i);
 });
 
 test("uses in-stock variant prices for available product results", () => {

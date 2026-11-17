@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Product = require("../models/productModel");
 const { searchProducts } = require("./productSearchService");
 const { createHttpError } = require("../utils/chatbotRequest");
@@ -17,6 +18,17 @@ const getRecommendations = async ({
     if (!/^[a-f\d]{24}$/i.test(String(productId))) {
       throw createHttpError(400, "productId must be a valid product ID.");
     }
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    throw createHttpError(
+      503,
+      "The product catalog is temporarily unavailable. Please try again shortly.",
+      "DATABASE_UNAVAILABLE"
+    );
+  }
+
+  if (productId) {
     seedProduct = await Product.findOne({ _id: productId, status: "active" })
       .select("category subcategory brand price")
       .lean();

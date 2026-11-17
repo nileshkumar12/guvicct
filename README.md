@@ -20,7 +20,7 @@ catalog search and order lookups remain database-backed.
 | GET | `/api/chatbot/conversations?page=1&limit=20` | JWT | Paginated signed-in user's conversations |
 | DELETE | `/api/chatbot/conversation/:id` | Conversation owner | Delete by Mongo conversation ID; guests must also pass `sessionId` |
 | POST | `/api/chatbot/product-search` | Guest or JWT | Search the live catalog; accepts filters or a natural-language query |
-| POST | `/api/chatbot/recommendations` | Guest or JWT | Recommend active, in-stock catalog products |
+| POST | `/api/chatbot/recommendations` | Guest or JWT | Recommend active, in-stock catalog products; uses a live catalog keyword search if AI query interpretation is unavailable |
 | POST | `/api/chatbot/order-status` | JWT | List recent orders or look up one by `orderNumber` |
 
 Chat responses include `success`, `sessionId`, `conversationId`, `message`,
