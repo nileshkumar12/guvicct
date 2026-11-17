@@ -13,7 +13,7 @@ const normalizeEmailPassword = (value) => {
   return normalizeEnv(value).replace(/\s+/g, '');
 };
 
-const MONGODB_URI = normalizeEnv(process.env.MONGODB_URI);
+const MONGODB_URI = normalizeEnv(process.env.MONGODB_URI || process.env.MONGO_URI);
 const HOST = normalizeEnv(process.env.HOST);
 const PORT = normalizeEnv(process.env.PORT);
 const CLOUDINARY_CLOUD_NAME = normalizeEnv(process.env.CLOUDINARY_CLOUD_NAME);

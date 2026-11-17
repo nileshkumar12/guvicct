@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const userRouter = require("./routes/userRouter");
 const invoiceRouter = require("./routes/invoiceRouter");
@@ -16,6 +18,8 @@ const shipmentRoutes = require('./routes/shipmentRoutes');
 const storeRoutes = require("./routes/storeRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const conntactEmailRoutes = require("./routes/sendcontactemailRouter");
+const chatbotRoutes = require("./routes/chatbotRoutes");
+const errorMiddleware = require("./middleware/errorMiddleware");
 
 const cors = require("cors");
 const path = require("path");
@@ -36,6 +40,9 @@ const allowedOrigins = [
   "https://vyason.com",
   "http://www.vyason.com",
   "https://www.vyason.com",
+  ...String(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
 ].filter(Boolean);
 
 app.use(
@@ -51,7 +58,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const logger = require('./utils/logger');
@@ -74,6 +81,8 @@ app.use('/api/shipments', shipmentRoutes);
 app.use("/api/stores", storeRoutes);
 app.use("/api", reviewRoutes);
 app.use("/api/email/contactemail", conntactEmailRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
+app.use(errorMiddleware);
 
 module.exports =app;
