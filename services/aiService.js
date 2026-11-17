@@ -91,9 +91,19 @@ const callOpenAI = async (request) => {
       ...request,
     });
   } catch (error) {
-    if (!error.status) error.status = 502;
-    if (!error.code) error.code = "AI_PROVIDER_ERROR";
-    throw error;
+    if (error.code === "AI_NOT_CONFIGURED") {
+      error.isAIProviderError = true;
+      throw error;
+    }
+
+    const providerError = createHttpError(
+      502,
+      "The AI shopping assistant is temporarily unavailable.",
+      "AI_PROVIDER_ERROR"
+    );
+    providerError.isAIProviderError = true;
+    providerError.cause = error;
+    throw providerError;
   }
 };
 
@@ -131,69 +141,98 @@ const executeTool = async (call, userId) => {
   throw createHttpError(400, "That assistant action is not available.");
 };
 
-const generateAIResponse = async ({ message, history = [], userId = null }) => {
+const generateAIResponse = async ({
+  message,
+  history = [],
+  userId = null,
+  callAI = callOpenAI,
+  searchCatalog = searchProducts,
+}) => {
   const tools = userId ? [searchProductsTool, orderStatusTool] : [searchProductsTool];
-  const response = await callOpenAI({
-    instructions: VYASON_SYSTEM_PROMPT,
-    input: [
-      ...history.slice(-10).map(({ role, content }) => ({ role, content })),
-      { role: "user", content: message },
-    ],
-    tools,
-    max_output_tokens: 700,
-  });
-
-  const products = [];
-  let intent = "conversation";
-  let rounds = 0;
-  let currentResponse = response;
-
-  while (rounds < 2) {
-    const calls = (currentResponse.output || []).filter(
-      (item) => item.type === "function_call"
-    );
-    if (!calls.length) break;
-
-    const outputs = [];
-    for (const call of calls) {
-      const result = await executeTool(call, userId);
-      if (call.name === "search_products") {
-        intent = "product_search";
-        products.push(...result.products);
-      } else {
-        intent = "order_assistance";
-      }
-      outputs.push({
-        type: "function_call_output",
-        call_id: call.call_id,
-        output: JSON.stringify(result),
-      });
-    }
-
-    currentResponse = await callOpenAI({
+  try {
+    const response = await callAI({
       instructions: VYASON_SYSTEM_PROMPT,
-      previous_response_id: currentResponse.id,
-      input: outputs,
+      input: [
+        ...history.slice(-10).map(({ role, content }) => ({ role, content })),
+        { role: "user", content: message },
+      ],
       tools,
       max_output_tokens: 700,
     });
-    rounds += 1;
-  }
 
-  if ((currentResponse.output || []).some((item) => item.type === "function_call")) {
-    throw createHttpError(502, "The assistant could not finish this request.", "AI_TOOL_LIMIT");
-  }
+    const products = [];
+    let intent = "conversation";
+    let rounds = 0;
+    let currentResponse = response;
 
-  const reply = currentResponse.output_text?.trim();
-  if (!reply) {
-    throw createHttpError(502, "The assistant returned an empty response.", "AI_EMPTY_RESPONSE");
-  }
+    while (rounds < 2) {
+      const calls = (currentResponse.output || []).filter(
+        (item) => item.type === "function_call"
+      );
+      if (!calls.length) break;
 
-  return {
-    reply,
-    intent,
-    products: [...new Map(products.map((product) => [product.id, product])).values()],
-  };
+      const outputs = [];
+      for (const call of calls) {
+        const result = await executeTool(call, userId);
+        if (call.name === "search_products") {
+          intent = "product_search";
+          products.push(...result.products);
+        } else {
+          intent = "order_assistance";
+        }
+        outputs.push({
+          type: "function_call_output",
+          call_id: call.call_id,
+          output: JSON.stringify(result),
+        });
+      }
+
+      currentResponse = await callAI({
+        instructions: VYASON_SYSTEM_PROMPT,
+        previous_response_id: currentResponse.id,
+        input: outputs,
+        tools,
+        max_output_tokens: 700,
+      });
+      rounds += 1;
+    }
+
+    if ((currentResponse.output || []).some((item) => item.type === "function_call")) {
+      throw createHttpError(502, "The assistant could not finish this request.", "AI_TOOL_LIMIT");
+    }
+
+    const reply = currentResponse.output_text?.trim();
+    if (!reply) {
+      throw createHttpError(502, "The assistant returned an empty response.", "AI_EMPTY_RESPONSE");
+    }
+
+    return {
+      reply,
+      intent,
+      products: [...new Map(products.map((product) => [product.id, product])).values()],
+    };
+  } catch (error) {
+    if (!error.isAIProviderError && error.code !== "AI_NOT_CONFIGURED" && error.code !== "AI_PROVIDER_ERROR") {
+      throw error;
+    }
+
+    console.warn("AI response unavailable; searching the live product catalog.", {
+      code: error.code,
+    });
+    const result = await searchCatalog({
+      keyword: message,
+      availability: true,
+      limit: 8,
+    });
+    const products = result.products || [];
+    return {
+      reply: products.length
+        ? "The AI assistant is temporarily unavailable, but I found these matching products in our catalog."
+        : "The AI assistant is temporarily unavailable, and I couldn't find matching products in our catalog. Please try a product name or category.",
+      intent: "product_search",
+      products: [...new Map(products.map((product) => [product.id, product])).values()],
+    };
+  }
 };
 
 const extractProductFilters = async (query) => {

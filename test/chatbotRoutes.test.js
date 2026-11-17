@@ -4,6 +4,7 @@ const app = require("../app");
 const mongoose = require("mongoose");
 const { resolveRecommendationFilters } = require("../controllers/chatbotController");
 const { formatProduct } = require("../services/productSearchService");
+const { generateAIResponse } = require("../services/aiService");
 
 let server;
 let baseUrl;
@@ -94,6 +95,47 @@ test("uses explicit recommendation filters without invoking AI", async () => {
   assert.equal(result.fallbackUsed, false);
   assert.equal(result.filters.category, "clothing");
   assert.equal(result.filters.keyword, "blue jacket");
+});
+
+test("falls back to actual catalog results when the AI provider is unavailable", async () => {
+  const product = { id: "catalog-product-id", name: "Catalog product", price: 25 };
+  let searchOptions;
+  const result = await generateAIResponse({
+    message: "stationary product",
+    callAI: async () => {
+      const error = new Error("AI provider unavailable.");
+      error.code = "AI_PROVIDER_ERROR";
+      error.isAIProviderError = true;
+      throw error;
+    },
+    searchCatalog: async (options) => {
+      searchOptions = options;
+      return { products: [product] };
+    },
+  });
+
+  assert.deepEqual(searchOptions, {
+    keyword: "stationary product",
+    availability: true,
+    limit: 8,
+  });
+  assert.equal(result.intent, "product_search");
+  assert.deepEqual(result.products, [product]);
+  assert.match(result.reply, /found these matching products/i);
+});
+
+test("preserves normal AI responses when the provider succeeds", async () => {
+  const result = await generateAIResponse({
+    message: "hello",
+    callAI: async () => ({ output_text: "Hello! How can I help?", output: [] }),
+    searchCatalog: async () => {
+      throw new Error("Catalog fallback should not be used.");
+    },
+  });
+
+  assert.equal(result.reply, "Hello! How can I help?");
+  assert.equal(result.intent, "conversation");
+  assert.deepEqual(result.products, []);
 });
 
 test("returns a meaningful 503 when recommendation catalog data is unavailable", async (t) => {
