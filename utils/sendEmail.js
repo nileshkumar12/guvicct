@@ -180,7 +180,7 @@ if (!resendApiKey) {
     subject: `Order Confirmation - ${orderNumber}`, html, }); 
     if (result.error && bccRecipients.length > 0) {
       console.error(
-        "Order confirmation BCC recipients were rejected; retrying for buyer only:",
+        "Order confirmation BCC recipients were rejected; retrying recipients separately:",
         result.error
       );
       result = await resend.emails.send({
@@ -189,6 +189,29 @@ if (!resendApiKey) {
         subject: `Order Confirmation - ${orderNumber}`,
         html,
       });
+
+      for (const bccRecipient of bccRecipients) {
+        try {
+          const recipientResult = await resend.emails.send({
+            from: fromEmail,
+            to: [bccRecipient],
+            subject: `Order Confirmation - ${orderNumber}`,
+            html,
+          });
+
+          if (recipientResult.error) {
+            console.error(
+              "Order confirmation email failed for an additional recipient:",
+              recipientResult.error
+            );
+          }
+        } catch (recipientError) {
+          console.error(
+            "Order confirmation email request failed for an additional recipient:",
+            recipientError.message
+          );
+        }
+      }
     }
     const { data, error } = result;
     if (error) { 
