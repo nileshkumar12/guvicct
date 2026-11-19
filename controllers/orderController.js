@@ -1325,6 +1325,10 @@ exports.placeOrder =
                     .populate(
                         "items.product",
                         "name price image"
+                    )
+                    .populate(
+                        "items.seller",
+                        "name email"
                     );
 
 
@@ -1393,9 +1397,32 @@ exports.placeOrder =
                 populatedOrder?.user?.email
             ) {
 
-                sendOrderConfirmationEmail(
-                    populatedOrder
-                )
+                Promise.resolve()
+                    .then(async () => {
+                        const adminUsers = await User.find({
+                            role: "admin",
+                        })
+                            .select("email")
+                            .lean()
+                            .catch((adminEmailError) => {
+                                console.error(
+                                    "Admin email lookup error:",
+                                    adminEmailError.message
+                                );
+                                return [];
+                            });
+
+                        const sellerEmails = (populatedOrder.items || [])
+                            .map((item) => item.seller?.email);
+                        const adminEmails = adminUsers.map(
+                            (admin) => admin.email
+                        );
+
+                        return sendOrderConfirmationEmail(
+                            populatedOrder,
+                            { bcc: [...sellerEmails, ...adminEmails] }
+                        );
+                    })
                     .then((info) => {
 
                         console.log(

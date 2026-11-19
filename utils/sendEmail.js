@@ -3,14 +3,27 @@ const resendApiKey = process.env.RESEND_API_KEY;
 if (!resendApiKey) { 
   console.error("❌ RESEND_API_KEY is not configured"); } 
   const resend = new Resend(resendApiKey); 
-  const sendOrderConfirmationEmail = async (order) => {
+  const sendOrderConfirmationEmail = async (order, { bcc = [] } = {}) => {
      try { 
       if (!order) { throw new Error("Order data is missing"); } 
-      const recipient = order.user?.email; 
+      const recipient = order.user?.email?.trim();
       if (!recipient)
          { throw new Error("Customer email is missing"); }
        if (!resendApiKey) 
         { throw new Error("RESEND_API_KEY is not configured"); }
+        const bccRecipients = [
+          ...new Map(
+            (Array.isArray(bcc) ? bcc : [])
+              .filter((email) => typeof email === "string")
+              .map((email) => email.trim())
+              .filter(
+                (email) =>
+                  email &&
+                  email.toLowerCase() !== recipient.toLowerCase()
+              )
+              .map((email) => [email.toLowerCase(), email])
+          ).values(),
+        ];
         const orderNumber = order.orderNumber || order.orderNo || order._id?.toString() || "N/A"; 
         console.log("📧 Sending order email to:", recipient);
         console.log("📦 Order:", orderNumber); 
@@ -163,6 +176,7 @@ if (!resendApiKey) {
     const { data, error } = await resend.emails.send({ 
     from: fromEmail, 
     to: [recipient], 
+    ...(bccRecipients.length > 0 ? { bcc: bccRecipients } : {}),
     subject: `Order Confirmation - ${orderNumber}`, html, }); 
     if (error) { 
     console.error("❌ Resend API error:");

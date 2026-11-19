@@ -84,6 +84,19 @@ const extractionTool = {
   strict: true,
 };
 
+const isGeneralProductRequest = (message) => {
+  const words = String(message).toLowerCase().match(/[a-z0-9]+/g) || [];
+  const genericWords = new Set([
+    "a", "all", "and", "anything", "available", "browse", "can", "catalog",
+    "catalogue", "do", "few", "find", "for", "get", "give", "have", "i", "in",
+    "item", "items", "list", "me", "more", "of", "options", "our", "please",
+    "product", "products", "recommend", "recommendation", "recommendations",
+    "see", "show", "some", "suggest", "suggestions", "the", "to", "want", "what",
+    "you",
+  ]);
+  return words.length > 0 && words.every((word) => genericWords.has(word));
+};
+
 const callOpenAI = async (request) => {
   try {
     return await getOpenAIClient().responses.create({
@@ -219,15 +232,18 @@ const generateAIResponse = async ({
     console.warn("AI response unavailable; searching the live product catalog.", {
       code: error.code,
     });
+    const generalRequest = isGeneralProductRequest(message);
     const result = await searchCatalog({
-      keyword: message,
+      keyword: generalRequest ? "" : message,
       availability: true,
       limit: 8,
     });
     const products = result.products || [];
     return {
       reply: products.length
-        ? "The AI assistant is temporarily unavailable, but I found these matching products in our catalog."
+        ? generalRequest
+          ? "The AI assistant is temporarily unavailable, but here are some available products from our catalog."
+          : "The AI assistant is temporarily unavailable, but I found these matching products in our catalog."
         : "The AI assistant is temporarily unavailable, and I couldn't find matching products in our catalog. Please try a product name or category.",
       intent: "product_search",
       products: [...new Map(products.map((product) => [product.id, product])).values()],

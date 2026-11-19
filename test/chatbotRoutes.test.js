@@ -124,6 +124,32 @@ test("falls back to actual catalog results when the AI provider is unavailable",
   assert.match(result.reply, /found these matching products/i);
 });
 
+test("shows available catalog products for a general product discovery request", async () => {
+  const product = { id: "catalog-product-id", name: "Catalog product", price: 25 };
+  let searchOptions;
+  const result = await generateAIResponse({
+    message: "show products",
+    callAI: async () => {
+      const error = new Error("AI provider unavailable.");
+      error.code = "AI_PROVIDER_ERROR";
+      error.isAIProviderError = true;
+      throw error;
+    },
+    searchCatalog: async (options) => {
+      searchOptions = options;
+      return { products: [product] };
+    },
+  });
+
+  assert.deepEqual(searchOptions, {
+    keyword: "",
+    availability: true,
+    limit: 8,
+  });
+  assert.deepEqual(result.products, [product]);
+  assert.match(result.reply, /here are some available products/i);
+});
+
 test("preserves normal AI responses when the provider succeeds", async () => {
   const result = await generateAIResponse({
     message: "hello",
