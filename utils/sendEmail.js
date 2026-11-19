@@ -173,11 +173,24 @@ if (!resendApiKey) {
     console.log("📨 Sending through Resend...");
     console.log("From:", fromEmail);
     console.log("To:", recipient);
-    const { data, error } = await resend.emails.send({ 
+    let result = await resend.emails.send({
     from: fromEmail, 
     to: [recipient], 
     ...(bccRecipients.length > 0 ? { bcc: bccRecipients } : {}),
     subject: `Order Confirmation - ${orderNumber}`, html, }); 
+    if (result.error && bccRecipients.length > 0) {
+      console.error(
+        "Order confirmation BCC recipients were rejected; retrying for buyer only:",
+        result.error
+      );
+      result = await resend.emails.send({
+        from: fromEmail,
+        to: [recipient],
+        subject: `Order Confirmation - ${orderNumber}`,
+        html,
+      });
+    }
+    const { data, error } = result;
     if (error) { 
     console.error("❌ Resend API error:");
     console.error(error);
